@@ -3,18 +3,24 @@ package com.google.devtools.ksp.test
 import org.gradle.testkit.runner.GradleRunner
 import org.gradle.testkit.runner.TaskOutcome
 import org.junit.Assert
+import org.junit.Assume
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 import java.util.jar.*
 
-class MultiplatformIT {
+@RunWith(Parameterized::class)
+class MultiplatformIT(useKSP2: Boolean) {
     @Rule
     @JvmField
-    val project: TemporaryTestProject = TemporaryTestProject("playground-mpp", "playground")
+    val project: TemporaryTestProject = TemporaryTestProject("playground-mpp", "playground", useKSP2 = useKSP2)
 
     @Test
     fun testJVM() {
+        Assume.assumeFalse(System.getProperty("os.name").startsWith("mac", ignoreCase = true))
+        Assume.assumeFalse(System.getProperty("os.name").startsWith("Windows", ignoreCase = true))
         val gradleRunner = GradleRunner.create().withProjectDir(project.root)
 
         val resultCleanBuild =
@@ -30,5 +36,11 @@ class MultiplatformIT {
             Assert.assertTrue(jarFile.getEntry("hello/HELLO.class").size > 0)
             Assert.assertTrue(jarFile.getEntry("com/example/AClassBuilder.class").size > 0)
         }
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "KSP2={0}")
+        fun params() = listOf(arrayOf(true), arrayOf(false))
     }
 }

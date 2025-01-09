@@ -20,7 +20,10 @@
 // EXPECTED:
 // java.io.IOException,java.util.NoSuchElementException
 // java.io.IOException,java.lang.IndexOutOfBoundsException
+// ThrowsException.method.T
 // java.io.IOException,java.util.NoSuchElementException
+// java.lang.IndexOutOfBoundsException
+// java.util.NoSuchElementException
 // java.lang.IndexOutOfBoundsException
 // java.io.IOException
 // java.io.IOException,java.lang.IndexOutOfBoundsException
@@ -29,9 +32,11 @@
 // java.lang.IllegalStateException
 // java.io.IOException
 // java.lang.IllegalStateException,java.lang.IllegalArgumentException
-// java.io.IOException
+// java.util.NoSuchElementException
 // java.lang.IndexOutOfBoundsException
+// java.io.IOException
 // java.io.IOException,java.lang.IndexOutOfBoundsException
+// java.lang.IndexOutOfBoundsException
 // java.io.IOException
 // END
 // MODULE: lib
@@ -79,6 +84,10 @@ class KtLib {
     @get:Throws(IOException::class)
     @set:Throws(IllegalStateException::class, IllegalArgumentException::class)
     var bothThrows: Int = 3
+
+    @set:Throws(java.lang.IndexOutOfBoundsException::class)
+    @get:Throws(java.util.NoSuchElementException::class)
+    var syntheticAccessors: Int = 0
 }
 // MODULE: main(lib)
 // FILE: ThrowsException.java
@@ -89,6 +98,8 @@ public class ThrowsException {
     public int foo() throws IOException, IndexOutOfBoundsException{
         return 1;
     }
+
+    <T extends Throwable> void method() throws T {}
 }
 // FILE: a.kt
 class ThrowsKt {
@@ -104,4 +115,8 @@ class ThrowsKt {
     set(a: Int) {
 
     }
+
+    @set:Throws(java.lang.IndexOutOfBoundsException::class)
+    @get:Throws(java.util.NoSuchElementException::class)
+    var syntheticAccessors: Int
 }

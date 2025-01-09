@@ -18,8 +18,8 @@
 package com.google.devtools.ksp.symbol.impl.kotlin
 
 import com.google.devtools.ksp.ExceptionMessage
-import com.google.devtools.ksp.KSObjectCache
-import com.google.devtools.ksp.memoized
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSNode
@@ -30,21 +30,9 @@ import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.symbol.Origin
+import com.google.devtools.ksp.symbol.impl.toKSModifiers
 import com.google.devtools.ksp.symbol.impl.toLocation
-import com.google.devtools.ksp.toKSModifiers
-import org.jetbrains.kotlin.psi.KtAnnotationEntry
-import org.jetbrains.kotlin.psi.KtClassOrObject
-import org.jetbrains.kotlin.psi.KtDynamicType
-import org.jetbrains.kotlin.psi.KtFunction
-import org.jetbrains.kotlin.psi.KtFunctionType
-import org.jetbrains.kotlin.psi.KtNullableType
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtTypeAlias
-import org.jetbrains.kotlin.psi.KtTypeParameter
-import org.jetbrains.kotlin.psi.KtTypeProjection
-import org.jetbrains.kotlin.psi.KtTypeReference
-import org.jetbrains.kotlin.psi.KtUserType
+import org.jetbrains.kotlin.psi.*
 
 class KSTypeReferenceImpl private constructor(val ktTypeReference: KtTypeReference) : KSTypeReference {
     companion object : KSObjectCache<KtTypeReference, KSTypeReferenceImpl>() {
@@ -124,6 +112,7 @@ class KSTypeReferenceImpl private constructor(val ktTypeReference: KtTypeReferen
             is KtFunctionType -> KSCallableReferenceImpl.getCached(typeElement)
             is KtUserType -> KSClassifierReferenceImpl.getCached(typeElement)
             is KtDynamicType -> KSDynamicReferenceImpl.getCached(this)
+            is KtIntersectionType -> KSDefNonNullReferenceImpl.getCached(typeElement)
             else -> throw IllegalStateException("Unexpected type element ${typeElement?.javaClass}, $ExceptionMessage")
         }
     }

@@ -19,6 +19,7 @@ package com.google.devtools.ksp
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.PathSensitivity
 
 // This file is mostly ported from AndroidX with minor modifications.
 // https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:buildSrc/src/main/kotlin/androidx/build/Ktlint.kt
@@ -34,7 +35,7 @@ fun Project.configureKtlintApplyToIdea() {
         task.description = "Apply ktlint style to idea"
         task.group = "Tooling"
         task.classpath = getKtlintConfiguration()
-        task.main = "com.pinterest.ktlint.Main"
+        task.mainClass.set("com.pinterest.ktlint.Main")
         task.args = listOf(
             "applyToIDEAProject",
             "-y"
@@ -79,17 +80,22 @@ private fun JavaExec.configureCommonKtlintParams(
         it.include("**/*.kts")
         it.exclude("**/testData/**")
         it.exclude("**/build/**")
+        it.exclude("dist/**")
         it.exclude("**/.*/**")
+        it.exclude("**/resources/**")
     }
-    val outputFile = project.buildDir.resolve("reports/ktlint/ktlint-checkstyle-report.xml")
-    inputs.files(ktlintInputFiles)
+    val outputFile = project.layout.buildDirectory.file("reports/ktlint/ktlint-checkstyle-report.xml")
+        .map{ it.asFile.toRelativeString(project.layout.projectDirectory.asFile) }
+        .get()
+    inputs.files(ktlintInputFiles).withPropertyName("ktlintInputFiles").withPathSensitivity(PathSensitivity.RELATIVE)
     classpath = project.getKtlintConfiguration()
-    main = "com.pinterest.ktlint.Main"
-    outputs.file(outputFile)
+    mainClass.set("com.pinterest.ktlint.Main")
+    outputs.file(outputFile).withPropertyName("ktlintOutputFile")
+    outputs.cacheIf { true }
     args = listOf(
         "--reporter=plain",
         "--reporter=checkstyle,output=$outputFile",
-    ) + ktlintInputFiles.files.map { it.absolutePath }
+    ) + ktlintInputFiles.files.map { it.toRelativeString(project.projectDir) }
 }
 
 private fun Project.getKtlintConfiguration(): Configuration {

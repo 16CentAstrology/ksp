@@ -1,14 +1,16 @@
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.IdKeyPair
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.IdKeyPair
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
 import com.google.devtools.ksp.symbol.*
-import org.jetbrains.kotlin.analysis.api.types.KtType
+import org.jetbrains.kotlin.analysis.api.types.KaType
 
-class KSValueParameterLiteImpl private constructor(private val ktType: KtType, override val parent: KSNode) :
+class KSValueParameterLiteImpl private constructor(ktType: KaType, override val parent: KSNode) :
     KSValueParameter {
-    companion object : KSObjectCache<IdKeyPair<KtType, KSNode>, KSValueParameter>() {
-        fun getCached(ktType: KtType, parent: KSNode): KSValueParameter = cache.getOrPut(IdKeyPair(ktType, parent)) {
+    companion object : KSObjectCache<IdKeyPair<KaType, KSNode>, KSValueParameter>() {
+        fun getCached(ktType: KaType, parent: KSNode): KSValueParameter = cache.getOrPut(IdKeyPair(ktType, parent)) {
             KSValueParameterLiteImpl(ktType, parent)
         }
     }
@@ -16,7 +18,7 @@ class KSValueParameterLiteImpl private constructor(private val ktType: KtType, o
     // preferably maybe use empty name to match compiler, but use underscore to match FE1.0 implementation.
     override val name: KSName = KSNameImpl.getCached("_")
 
-    override val type: KSTypeReference = KSTypeReferenceImpl.getCached(ktType)
+    override val type: KSTypeReference = KSTypeReferenceResolvedImpl.getCached(ktType)
 
     override val isVararg: Boolean = false
 

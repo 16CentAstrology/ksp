@@ -17,22 +17,21 @@
 
 package com.google.devtools.ksp.symbol.impl.java
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.common.toKSModifiers
 import com.google.devtools.ksp.isConstructor
-import com.google.devtools.ksp.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
-import com.google.devtools.ksp.processing.impl.workaroundForNested
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.*
 import com.google.devtools.ksp.symbol.impl.binary.getAllFunctions
 import com.google.devtools.ksp.symbol.impl.binary.getAllProperties
 import com.google.devtools.ksp.symbol.impl.kotlin.KSErrorType
 import com.google.devtools.ksp.symbol.impl.kotlin.KSExpectActualNoImpl
-import com.google.devtools.ksp.symbol.impl.kotlin.KSNameImpl
 import com.google.devtools.ksp.symbol.impl.kotlin.getKSTypeCached
 import com.google.devtools.ksp.symbol.impl.replaceTypeArguments
 import com.google.devtools.ksp.symbol.impl.synthetic.KSConstructorSyntheticImpl
-import com.google.devtools.ksp.toKSModifiers
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiEnumConstant
 import com.intellij.psi.PsiJavaFile
@@ -75,7 +74,7 @@ class KSClassDeclarationJavaImpl private constructor(val psi: PsiClass) :
 
     // Could the resolution ever fail?
     private val descriptor: ClassDescriptor? by lazy {
-        ResolverImpl.instance!!.moduleClassResolver.resolveClass(JavaClassImpl(psi).apply { workaroundForNested() })
+        ResolverImpl.instance!!.moduleClassResolver.resolveClass(JavaClassImpl(psi))
     }
 
     // TODO in 1.5 + jvmTarget 15, will we return Java permitted types?
@@ -154,17 +153,13 @@ class KSClassDeclarationJavaImpl private constructor(val psi: PsiClass) :
     }
 
     override fun asType(typeArguments: List<KSTypeArgument>): KSType {
-        return descriptor?.let {
-            it.defaultType.replaceTypeArguments(typeArguments)?.let {
-                getKSTypeCached(it, typeArguments)
-            }
-        } ?: KSErrorType
+        return descriptor?.defaultType?.replaceTypeArguments(typeArguments) ?: KSErrorType(psi.qualifiedName)
     }
 
     override fun asStarProjectedType(): KSType {
         return descriptor?.let {
             getKSTypeCached(it.defaultType.replaceArgumentsWithStarProjections())
-        } ?: KSErrorType
+        } ?: KSErrorType(psi.qualifiedName)
     }
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {

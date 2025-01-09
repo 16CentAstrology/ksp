@@ -22,10 +22,11 @@ dependencies {
 }
 
 android {
-    compileSdkVersion(30)
+    namespace = "com.example.mylibrary"
+    compileSdk = 34
     defaultConfig {
-        minSdkVersion(30)
-        targetSdkVersion(30)
+        minSdk = 34
+        targetSdk = 34
     }
 }
 

@@ -29,8 +29,8 @@
 // C.PFun.P?
 // kotlin.collections.MutableList<out kotlin.collections.MutableSet<kotlin.Double?>?>?
 // kotlin.collections.MutableList<in kotlin.collections.MutableList<out kotlin.Double?>?>?
-// Bar?
-// kotlin.Array<Bar?>?
+// <ERROR>?
+// kotlin.Array<<ERROR>?>?
 // Foo<Base.T?, Base.Inner.P?>?
 // Bar<Base.Inner.P?, Base.T?>?
 // kotlin.collections.MutableList<Base.T?>?
@@ -60,12 +60,6 @@
 // END
 // FILE: a.kt
 annotation class Test
-@Test
-class Foo<P>: C<P>() {
-
-}
-
-class Bar
 
 // FILE: C.java
 import java.util.List;

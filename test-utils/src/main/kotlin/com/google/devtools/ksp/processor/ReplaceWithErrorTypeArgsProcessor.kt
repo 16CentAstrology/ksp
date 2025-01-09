@@ -18,6 +18,7 @@
 package com.google.devtools.ksp.processor
 
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 
@@ -49,6 +50,8 @@ open class ReplaceWithErrorTypeArgsProcessor : AbstractTestProcessor() {
         val xargs = x.type.element!!.typeArguments
         val y = resolver.getPropertyDeclarationByName(resolver.getKSNameFromString("y"), true)!!
         val yargs = y.type.element!!.typeArguments
+        val z = resolver.getPropertyDeclarationByName(resolver.getKSNameFromString("z"), true)!!
+        val zargs = z.type.element!!.typeArguments
 
         for (decl in decls) {
             val declName = decl.qualifiedName!!.asString()
@@ -57,6 +60,25 @@ open class ReplaceWithErrorTypeArgsProcessor : AbstractTestProcessor() {
             results.add("$declName.asType($xargs): ${decl.asType(xargs)}")
             results.add("$declName.asType($yargs): ${decl.asType(yargs)}")
             results.add("$declName.asType(emptyList()): ${decl.asType(emptyList())}")
+        }
+        val function = resolver.getFunctionDeclarationsByName(resolver.getKSNameFromString("f"), true).single()
+        results.add("default type:${function.parameters.single().type.resolve().replace(emptyList())}")
+        // TODO: fix flexible type creation once upstream available.
+        val js1 = resolver.getClassDeclarationByName("JS1")!!
+        results.add("flexible type star:${js1.getDeclaredProperties().single().type.resolve().starProjection()}")
+        val javaClass = resolver.getClassDeclarationByName("JavaClass")!!
+        val genericFlexibleProperty = javaClass.getDeclaredProperties().single().type.resolve()
+        results.add("flexible type replace argument:${genericFlexibleProperty.replace(zargs)}")
+        resolver.getClassDeclarationByName("Foo")?.let { cls ->
+            cls.getDeclaredProperties().forEach { p ->
+                results.add(
+                    "${p.type.resolve().arguments}," +
+                        " ${p.type.resolve().arguments.map { it.type!!.resolve().replace(emptyList()) } }"
+                )
+            }
+        }
+        resolver.getClassDeclarationByName("ErrorSuper")?.let {
+            results.add("replace error type get: ${it.superTypes.single().resolve().replace(emptyList())}")
         }
         return emptyList()
     }

@@ -9,9 +9,13 @@ kotlin {
     jvm {
         withJava()
     }
-    js(BOTH) {
+    js(IR) {
         browser()
         nodejs()
+    }
+    wasmJs {
+        browser()
+        binaries.executable()
     }
     linuxX64() {
         binaries {
@@ -20,12 +24,12 @@ kotlin {
     }
     androidNativeX64() {
         binaries {
-            executable()
+            sharedLib()
         }
     }
     androidNativeArm64() {
         binaries {
-            executable()
+            sharedLib()
         }
     }
     // TODO: Enable after CI's Xcode version catches up.
@@ -43,10 +47,6 @@ kotlin {
         val androidNativeX64Main by getting
         val androidNativeArm64Main by getting
     }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions.freeCompilerArgs += "-Xuse-deprecated-legacy-compiler"
 }
 
 dependencies {

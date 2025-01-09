@@ -1,8 +1,11 @@
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.impl.recordLookup
+import com.google.devtools.ksp.impl.recordLookupForGetAllFunctions
+import com.google.devtools.ksp.impl.recordLookupForGetAllProperties
 import com.google.devtools.ksp.symbol.ClassKind
-import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSExpectActual
@@ -17,17 +20,15 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
-import com.google.devtools.ksp.symbol.Modifier
-import com.google.devtools.ksp.symbol.Origin
-import org.jetbrains.kotlin.analysis.api.symbols.KtEnumEntrySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtNamedClassOrObjectSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaEnumEntrySymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
 
-class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntrySymbol: KtEnumEntrySymbol) :
+class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntrySymbol: KaEnumEntrySymbol) :
     KSClassDeclaration,
     AbstractKSDeclarationImpl(ktEnumEntrySymbol),
     KSExpectActual by KSExpectActualImpl(ktEnumEntrySymbol) {
-    companion object : KSObjectCache<KtEnumEntrySymbol, KSClassDeclarationEnumEntryImpl>() {
-        fun getCached(ktEnumEntrySymbol: KtEnumEntrySymbol) =
+    companion object : KSObjectCache<KaEnumEntrySymbol, KSClassDeclarationEnumEntryImpl>() {
+        fun getCached(ktEnumEntrySymbol: KaEnumEntrySymbol) =
             cache.getOrPut(ktEnumEntrySymbol) { KSClassDeclarationEnumEntryImpl(ktEnumEntrySymbol) }
     }
 
@@ -44,23 +45,37 @@ class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntr
     override val isCompanionObject: Boolean = false
 
     override fun getSealedSubclasses(): Sequence<KSClassDeclaration> {
-        TODO("Not yet implemented")
+        return emptySequence()
     }
 
     override fun getAllFunctions(): Sequence<KSFunctionDeclaration> {
-        return ktEnumEntrySymbol.declarations().filterIsInstance<KSFunctionDeclaration>()
+        analyze {
+            ktEnumEntrySymbol.returnType.directSupertypes.forEach {
+                recordLookup(it, this@KSClassDeclarationEnumEntryImpl)
+            }
+            recordLookupForGetAllFunctions(ktEnumEntrySymbol.returnType.directSupertypes.toList())
+        }
+        return ktEnumEntrySymbol.enumEntryInitializer?.declarations()?.filterIsInstance<KSFunctionDeclaration>()
+            ?: emptySequence()
     }
 
     override fun getAllProperties(): Sequence<KSPropertyDeclaration> {
-        return ktEnumEntrySymbol.declarations().filterIsInstance<KSPropertyDeclaration>()
+        analyze {
+            ktEnumEntrySymbol.returnType.directSupertypes.forEach {
+                recordLookup(it, this@KSClassDeclarationEnumEntryImpl)
+            }
+            recordLookupForGetAllProperties(ktEnumEntrySymbol.returnType.directSupertypes.toList())
+        }
+        return ktEnumEntrySymbol.enumEntryInitializer?.declarations()?.filterIsInstance<KSPropertyDeclaration>()
+            ?: emptySequence()
     }
 
     override fun asType(typeArguments: List<KSTypeArgument>): KSType {
-        TODO("Not yet implemented")
+        return KSTypeImpl.getCached(ktEnumEntrySymbol.returnType).replace(typeArguments)
     }
 
     override fun asStarProjectedType(): KSType {
-        TODO("Not yet implemented")
+        return KSTypeImpl.getCached(ktEnumEntrySymbol.returnType).starProjection()
     }
 
     override val typeParameters: List<KSTypeParameter> = emptyList()
@@ -72,8 +87,8 @@ class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntr
     override val parentDeclaration: KSDeclaration? by lazy {
         analyze {
             (
-                ktEnumEntrySymbol.getContainingSymbol()
-                    as? KtNamedClassOrObjectSymbol
+                ktEnumEntrySymbol.containingSymbol
+                    as? KaNamedClassSymbol
                 )?.let { KSClassDeclarationImpl.getCached(it) }
         }
     }
@@ -82,23 +97,14 @@ class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntr
         ktEnumEntrySymbol.toContainingFile()
     }
 
-    override val docString: String?
-        get() = TODO("Not yet implemented")
-
-    override val modifiers: Set<Modifier>
-        get() = TODO("Not yet implemented")
-
-    override val origin: Origin
-        get() = TODO("Not yet implemented")
-
     override val location: Location by lazy {
         ktEnumEntrySymbol.psi.toLocation()
     }
 
-    override val parent: KSNode? by lazy {
+    override val parent: KSNode by lazy {
         analyze {
-            (ktEnumEntrySymbol.getContainingSymbol() as? KtNamedClassOrObjectSymbol)
-                ?.let { KSClassDeclarationImpl.getCached(it) }
+            (ktEnumEntrySymbol.containingSymbol as KaNamedClassSymbol)
+                .let { KSClassDeclarationImpl.getCached(it) }
         }
     }
 
@@ -106,24 +112,16 @@ class KSClassDeclarationEnumEntryImpl private constructor(private val ktEnumEntr
         return visitor.visitClassDeclaration(this, data)
     }
 
-    override val annotations: Sequence<KSAnnotation> = emptySequence()
-
-    override val isActual: Boolean
-        get() = TODO("Not yet implemented")
-
-    override val isExpect: Boolean
-        get() = TODO("Not yet implemented")
-
-    override fun findActuals(): Sequence<KSDeclaration> {
-        TODO("Not yet implemented")
-    }
-
-    override fun findExpects(): Sequence<KSDeclaration> {
-        TODO("Not yet implemented")
-    }
-
     override val declarations: Sequence<KSDeclaration> by lazy {
         // TODO: fix after .getDeclaredMemberScope() works for enum entry with no initializer.
         emptySequence()
+    }
+
+    override fun toString(): String {
+        return "$parent.${simpleName.asString()}"
+    }
+
+    override fun defer(): Restorable? {
+        return ktEnumEntrySymbol.defer(Companion::getCached)
     }
 }

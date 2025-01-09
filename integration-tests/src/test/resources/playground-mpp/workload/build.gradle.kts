@@ -12,8 +12,8 @@ kotlin {
     linuxX64()
     mingwX64()
     macosX64()
-    ios()
-    js(BOTH) {
+    iosX64()
+    js(IR) {
         browser()
         nodejs()
     }
@@ -27,10 +27,6 @@ kotlin {
             kotlin.srcDir("src/main/java")
         }
     }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions.freeCompilerArgs += "-Xuse-deprecated-legacy-compiler"
 }
 
 ksp {

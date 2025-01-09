@@ -33,8 +33,8 @@ import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.CompilerConfigurationKey
 import org.jetbrains.kotlin.config.KotlinCompilerVersion
+import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.languageVersionSettings
-import org.jetbrains.kotlin.config.toKotlinVersion
 import org.jetbrains.kotlin.resolve.extensions.AnalysisHandlerExtension
 
 private val KSP_OPTIONS = CompilerConfigurationKey.create<KspOptions.Builder>("Ksp options")
@@ -43,7 +43,7 @@ private val KSP_OPTIONS = CompilerConfigurationKey.create<KspOptions.Builder>("K
 class KotlinSymbolProcessingCommandLineProcessor : CommandLineProcessor {
     override val pluginId = "com.google.devtools.ksp.symbol-processing"
 
-    override val pluginOptions: Collection<AbstractCliOption> = KspCliOption.values().asList()
+    override val pluginOptions: Collection<AbstractCliOption> = KspCliOption.entries
 
     override fun processOption(option: AbstractCliOption, value: String, configuration: CompilerConfiguration) {
         if (option !is KspCliOption) {
@@ -65,11 +65,14 @@ class KotlinSymbolProcessingCommandLineProcessor : CommandLineProcessor {
 @ExperimentalCompilerApi
 class KotlinSymbolProcessingComponentRegistrar : ComponentRegistrar {
     override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
+        // KSP 1.x don't and will not support K2. Do not register if language version >= 2.
+        if (configuration.languageVersionSettings.languageVersion >= LanguageVersion.KOTLIN_2_0)
+            return
+
         val contentRoots = configuration[CLIConfigurationKeys.CONTENT_ROOTS] ?: emptyList()
         val options = configuration[KSP_OPTIONS]?.apply {
             javaSourceRoots.addAll(contentRoots.filterIsInstance<JavaSourceRoot>().map { it.file })
-            languageVersion = configuration.languageVersionSettings.languageVersion.toKotlinVersion()
-            apiVersion = configuration.languageVersionSettings.apiVersion.toKotlinVersion()
+            languageVersionSettings = configuration.languageVersionSettings
             compilerVersion = KotlinCompilerVersion.getVersion().toKotlinVersion()
         }?.build() ?: return
         val messageCollector = configuration.get(CLIConfigurationKeys.ORIGINAL_MESSAGE_COLLECTOR_KEY)
@@ -93,4 +96,8 @@ class KotlinSymbolProcessingComponentRegistrar : ComponentRegistrar {
             )
         }
     }
+
+    // FirKotlinToJvmBytecodeCompiler throws an error when it sees an incompatible plugin.
+    override val supportsK2: Boolean
+        get() = true
 }

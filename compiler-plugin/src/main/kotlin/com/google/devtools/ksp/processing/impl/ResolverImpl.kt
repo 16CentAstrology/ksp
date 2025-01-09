@@ -18,33 +18,48 @@
 package com.google.devtools.ksp.processing.impl
 
 import com.google.devtools.ksp.*
+import com.google.devtools.ksp.common.JVM_DEFAULT_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_DEFAULT_WITHOUT_COMPATIBILITY_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_STATIC_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_STRICTFP_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_SYNCHRONIZED_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_TRANSIENT_ANNOTATION_FQN
+import com.google.devtools.ksp.common.JVM_VOLATILE_ANNOTATION_FQN
+import com.google.devtools.ksp.common.extractThrowsAnnotation
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.common.impl.KSTypeReferenceSyntheticImpl
+import com.google.devtools.ksp.common.impl.RefPosition
+import com.google.devtools.ksp.common.impl.findOuterMostRef
+import com.google.devtools.ksp.common.impl.findRefPosition
+import com.google.devtools.ksp.common.impl.isReturnTypeOfAnnotationMethod
+import com.google.devtools.ksp.common.javaModifiers
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.common.visitor.CollectAnnotatedSymbolsVisitor
 import com.google.devtools.ksp.processing.KSBuiltIns
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.Variance
+import com.google.devtools.ksp.symbol.impl.*
 import com.google.devtools.ksp.symbol.impl.binary.*
 import com.google.devtools.ksp.symbol.impl.declarationsInSourceOrder
-import com.google.devtools.ksp.symbol.impl.findParentAnnotated
-import com.google.devtools.ksp.symbol.impl.findPsi
 import com.google.devtools.ksp.symbol.impl.getInstanceForCurrentRound
 import com.google.devtools.ksp.symbol.impl.java.*
-import com.google.devtools.ksp.symbol.impl.jvmAccessFlag
 import com.google.devtools.ksp.symbol.impl.kotlin.*
-import com.google.devtools.ksp.symbol.impl.resolveContainingClass
-import com.google.devtools.ksp.symbol.impl.synthetic.*
-import com.google.devtools.ksp.visitor.CollectAnnotatedSymbolsVisitor
+import com.google.devtools.ksp.symbol.impl.synthetic.KSConstructorSyntheticImpl
+import com.google.devtools.ksp.symbol.impl.synthetic.KSPropertyGetterSyntheticImpl
+import com.google.devtools.ksp.symbol.impl.synthetic.KSPropertySetterSyntheticImpl
+import com.google.devtools.ksp.symbol.impl.synthetic.KSValueParameterSyntheticImpl
 import com.intellij.openapi.project.Project
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.PsiClassReferenceType
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.jvm.JavaToKotlinClassMap
-import org.jetbrains.kotlin.codegen.ClassBuilderMode
-import org.jetbrains.kotlin.codegen.OwnerKind
-import org.jetbrains.kotlin.codegen.state.JVM_SUPPRESS_WILDCARDS_ANNOTATION_FQ_NAME
-import org.jetbrains.kotlin.codegen.state.JVM_WILDCARD_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.codegen.signature.BothSignatureWriter
 import org.jetbrains.kotlin.codegen.state.KotlinTypeMapper
+import org.jetbrains.kotlin.config.ApiVersion
+import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.config.LanguageVersionSettingsImpl
 import org.jetbrains.kotlin.container.ComponentProvider
 import org.jetbrains.kotlin.container.get
@@ -52,39 +67,25 @@ import org.jetbrains.kotlin.container.tryGetService
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.load.java.components.TypeUsage
 import org.jetbrains.kotlin.load.java.descriptors.JavaForKotlinOverridePropertyDescriptor
-import org.jetbrains.kotlin.load.java.lazy.JavaResolverComponents
-import org.jetbrains.kotlin.load.java.lazy.LazyJavaResolverContext
-import org.jetbrains.kotlin.load.java.lazy.ModuleClassResolver
-import org.jetbrains.kotlin.load.java.lazy.TypeParameterResolver
-import org.jetbrains.kotlin.load.java.lazy.childForClassOrPackage
-import org.jetbrains.kotlin.load.java.lazy.childForMethod
+import org.jetbrains.kotlin.load.java.descriptors.getImplClassNameForDeserialized
+import org.jetbrains.kotlin.load.java.lazy.*
 import org.jetbrains.kotlin.load.java.lazy.descriptors.LazyJavaTypeParameterDescriptor
 import org.jetbrains.kotlin.load.java.lazy.types.JavaTypeResolver
 import org.jetbrains.kotlin.load.java.lazy.types.toAttributes
 import org.jetbrains.kotlin.load.java.sources.JavaSourceElement
-import org.jetbrains.kotlin.load.java.structure.JavaClass
-import org.jetbrains.kotlin.load.java.structure.classId
-import org.jetbrains.kotlin.load.java.structure.impl.JavaArrayTypeImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaClassImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaConstructorImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaFieldImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaMethodImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaTypeImpl
-import org.jetbrains.kotlin.load.java.structure.impl.JavaTypeParameterImpl
+import org.jetbrains.kotlin.load.java.structure.impl.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaMethod
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaMethodBase
-import org.jetbrains.kotlin.load.kotlin.TypeMappingMode
-import org.jetbrains.kotlin.load.kotlin.VirtualFileKotlinClass
-import org.jetbrains.kotlin.load.kotlin.getContainingKotlinJvmBinaryClass
-import org.jetbrains.kotlin.load.kotlin.getOptimalModeForReturnType
-import org.jetbrains.kotlin.load.kotlin.getOptimalModeForValueParameter
-import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.load.kotlin.*
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
+import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_SUPPRESS_WILDCARDS_ANNOTATION_FQ_NAME
+import org.jetbrains.kotlin.name.JvmStandardClassIds.JVM_WILDCARD_ANNOTATION_FQ_NAME
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.*
@@ -93,7 +94,8 @@ import org.jetbrains.kotlin.resolve.calls.inference.components.NewTypeSubstituto
 import org.jetbrains.kotlin.resolve.calls.inference.components.composeWith
 import org.jetbrains.kotlin.resolve.calls.inference.substitute
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
-import org.jetbrains.kotlin.resolve.constants.*
+import org.jetbrains.kotlin.resolve.constants.ConstantValue
+import org.jetbrains.kotlin.resolve.constants.KClassValue
 import org.jetbrains.kotlin.resolve.constants.evaluate.ConstantExpressionEvaluator
 import org.jetbrains.kotlin.resolve.descriptorUtil.classId
 import org.jetbrains.kotlin.resolve.descriptorUtil.getAllSuperClassifiers
@@ -107,19 +109,17 @@ import org.jetbrains.kotlin.resolve.multiplatform.findExpects
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.LexicalScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import org.jetbrains.kotlin.serialization.deserialization.descriptors.DescriptorWithContainerSource
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.SimpleClassicTypeSystemContext
 import org.jetbrains.kotlin.types.typeUtil.replaceArgumentsWithStarProjections
 import org.jetbrains.kotlin.types.typeUtil.substitute
 import org.jetbrains.kotlin.types.typeUtil.supertypes
 import org.jetbrains.kotlin.util.containingNonLocalDeclaration
-import org.jetbrains.org.objectweb.asm.ClassReader
-import org.jetbrains.org.objectweb.asm.ClassVisitor
-import org.jetbrains.org.objectweb.asm.MethodVisitor
 import org.jetbrains.org.objectweb.asm.Opcodes
-import org.jetbrains.org.objectweb.asm.Opcodes.API_VERSION
+import org.jetbrains.org.objectweb.asm.Type
 import java.io.File
-import java.util.Stack
+import java.util.*
 
 class ResolverImpl(
     val module: ModuleDescriptor,
@@ -127,13 +127,17 @@ class ResolverImpl(
     val newKSFiles: Collection<KSFile>,
     private val deferredSymbols: Map<SymbolProcessor, List<KSAnnotated>>,
     val bindingTrace: BindingTrace,
-    val project: Project,
+    project: Project,
     componentProvider: ComponentProvider,
     val incrementalContext: IncrementalContext,
     val options: KspOptions,
 ) : Resolver {
     val psiDocumentManager = PsiDocumentManager.getInstance(project)
     private val nameToKSMap: MutableMap<KSName, KSClassDeclaration>
+    private val javaTypeParameterMap: MutableMap<LazyJavaTypeParameterDescriptor, PsiTypeParameter> = mutableMapOf()
+    private val packageInfoFiles by lazy {
+        allKSFiles.filter { it.fileName == "package-info.java" }.asSequence().memoized()
+    }
 
     /**
      * Checking as member of is an expensive operation, hence we cache result values in this map.
@@ -141,10 +145,10 @@ class ResolverImpl(
     private val functionAsMemberOfCache: MutableMap<Pair<KSFunctionDeclaration, KSType>, KSFunction>
     private val propertyAsMemberOfCache: MutableMap<Pair<KSPropertyDeclaration, KSType>, KSType>
 
+    private val moduleIdentifier = module.name.getNonSpecialIdentifier()
     private val typeMapper = KotlinTypeMapper(
-        BindingContext.EMPTY, ClassBuilderMode.LIGHT_CLASSES,
-        module.name.getNonSpecialIdentifier(),
-        KotlinTypeMapper.LANGUAGE_VERSION_SETTINGS_DEFAULT, // TODO use proper LanguageVersionSettings
+        moduleIdentifier,
+        LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_9, ApiVersion.KOTLIN_1_9),
         true
     )
     private val qualifiedExpressionResolver = QualifiedExpressionResolver(LanguageVersionSettingsImpl.DEFAULT)
@@ -218,7 +222,10 @@ class ResolverImpl(
 
     // Mitigation for processors with memory leaks
     // https://github.com/google/ksp/issues/1063
+    // https://github.com/google/ksp/issues/1653
     fun tearDown() {
+        KSObjectCacheManager.clear()
+        com.google.devtools.ksp.common.KSObjectCacheManager.clear()
         instance = null
     }
 
@@ -353,18 +360,26 @@ class ResolverImpl(
     override fun mapToJvmSignature(declaration: KSDeclaration): String? = mapToJvmSignatureInternal(declaration)
 
     internal fun mapToJvmSignatureInternal(declaration: KSDeclaration): String? = when (declaration) {
-        is KSClassDeclaration -> resolveClassDeclaration(declaration)?.let { typeMapper.mapType(it).descriptor }
+        is KSClassDeclaration -> resolveClassDeclaration(declaration)?.let {
+            typeMapper.mapType(it.defaultType).descriptor
+        }
         is KSFunctionDeclaration -> resolveFunctionDeclaration(declaration)?.let {
             when (it) {
                 is FunctionDescriptor -> typeMapper.mapAsmMethod(it).descriptor
-                is PropertyDescriptor -> typeMapper.mapFieldSignature(it.type, it) ?: typeMapper.mapType(it).descriptor
+                is PropertyDescriptor -> typeMapper.mapPropertySignature(it)
                 else -> throw IllegalStateException("Unexpected descriptor type for declaration: $declaration")
             }
         }
         is KSPropertyDeclaration -> resolvePropertyDeclaration(declaration)?.let {
-            typeMapper.mapFieldSignature(it.type, it) ?: typeMapper.mapType(it).descriptor
+            typeMapper.mapPropertySignature(it)
         }
         else -> null
+    }
+
+    private fun KotlinTypeMapper.mapPropertySignature(descriptor: PropertyDescriptor): String? {
+        val sw = BothSignatureWriter(BothSignatureWriter.Mode.TYPE)
+        writeFieldSignature(descriptor.type, descriptor, sw)
+        return sw.makeJavaGenericSignature() ?: mapType(descriptor.type).descriptor
     }
 
     override fun overrides(overrider: KSDeclaration, overridee: KSDeclaration): Boolean {
@@ -515,45 +530,49 @@ class ResolverImpl(
         }
     }
 
+    private val synthesizedPropPrefix = mapOf<String, (PropertyDescriptor?) -> PropertyAccessorDescriptor?>(
+        "set" to { it?.setter },
+        "get" to { it?.getter },
+        "is" to { it?.getter },
+    )
+
     // TODO: Resolve Java variables is not supported by this function. Not needed currently.
     fun resolveJavaDeclaration(psi: PsiElement): DeclarationDescriptor? {
         return when (psi) {
-            is PsiClass -> moduleClassResolver.resolveClass(
-                JavaClassImpl(psi).apply { workaroundForNested(lazyJavaResolverContext) }
-            )
+            is PsiClass -> moduleClassResolver.resolveClass(JavaClassImpl(psi))
             is PsiMethod -> {
-                // TODO: get rid of hardcoded check if possible.
-                val property = if (psi.name.startsWith("set") || psi.name.startsWith("get")) {
-                    moduleClassResolver
-                        .resolveContainingClass(psi)
-                        ?.findEnclosedDescriptor(
-                            kindFilter = DescriptorKindFilter.CALLABLES
-                        ) {
-                            (it as? PropertyDescriptor)?.getter?.findPsi() == psi ||
-                                (it as? PropertyDescriptor)?.setter?.findPsi() == psi
-                        }
-                } else null
+                val property = synthesizedPropPrefix.keys.firstOrNull {
+                    psi.name.startsWith(it) && psi.name.length > it.length && psi.name[it.length].isUpperCase()
+                }?.let { prefix ->
+                    val propName = psi.name.substring(prefix.length).replaceFirstChar(Char::lowercaseChar)
+                    moduleClassResolver.resolveContainingClass(psi)?.findEnclosedDescriptor(
+                        kindFilter = DescriptorKindFilter.VARIABLES,
+                        name = propName
+                    ) {
+                        synthesizedPropPrefix[prefix]!!(it as? PropertyDescriptor)?.correspondsTo(psi) == true
+                    }
+                }
                 property ?: moduleClassResolver
                     .resolveContainingClass(psi)?.let { containingClass ->
                         val filter = if (psi is SyntheticElement) {
                             { declaration: DeclarationDescriptor -> declaration.name.asString() == psi.name }
                         } else {
-                            { declaration: DeclarationDescriptor -> declaration.findPsi() == psi }
+                            { declaration: DeclarationDescriptor -> declaration.correspondsTo(psi) }
                         }
                         containingClass.findEnclosedDescriptor(
                             kindFilter = DescriptorKindFilter.FUNCTIONS,
+                            name = if (psi.name == containingClass.name.asString()) "<init>" else psi.name,
                             filter = filter
                         )
                     }
             }
             is PsiField -> {
                 moduleClassResolver
-                    .resolveClass(
-                        JavaFieldImpl(psi).containingClass.apply { workaroundForNested(lazyJavaResolverContext) }
-                    )
+                    .resolveClass(JavaFieldImpl(psi).containingClass)
                     ?.findEnclosedDescriptor(
                         kindFilter = DescriptorKindFilter.VARIABLES,
-                        filter = { it.findPsi() == psi }
+                        name = psi.name,
+                        filter = { it.correspondsTo(psi) }
                     )
             }
             else -> throw IllegalStateException("unhandled psi element kind: ${psi.javaClass}")
@@ -565,6 +584,7 @@ class ResolverImpl(
             is KSClassDeclarationImpl -> resolveDeclaration(classDeclaration.ktClassOrObject)
             is KSClassDeclarationDescriptorImpl -> classDeclaration.descriptor
             is KSClassDeclarationJavaImpl -> resolveJavaDeclaration(classDeclaration.psi)
+            is KSClassDeclarationJavaEnumEntryImpl -> resolveJavaDeclaration(classDeclaration.psi)
             else -> throw IllegalStateException("unexpected class: ${classDeclaration.javaClass}")
         } as ClassDescriptor?
     }
@@ -657,6 +677,39 @@ class ResolverImpl(
             resolverContext.typeResolver.transformJavaType(javaType, TypeUsage.COMMON.toAttributes())
     }
 
+    /*
+     * Don't map Java types in annotation parameters
+     *
+     * Users may specify Java types explicitly by instances of `Class<T>`.
+     * The situation is similar to `getClassDeclarationByName` where we have
+     * decided to keep those Java types not mapped.
+     *
+     * It would be troublesome if users try to use reflection on types that
+     * were mapped to Kotlin builtins, becuase some of those builtins don't
+     * even exist in classpath.
+     *
+     * Therefore, ResolverImpl.resolveJavaType cannot be used.
+     */
+    fun resolveJavaTypeInAnnotations(psiType: PsiType): KSType = if (options.mapAnnotationArgumentsInJava) {
+        getKSTypeCached(resolveJavaType(psiType))
+    } else {
+        when (psiType) {
+            is PsiPrimitiveType -> {
+                getClassDeclarationByName(psiType.boxedTypeName!!)!!.asStarProjectedType()
+            }
+            is PsiArrayType -> {
+                val componentType = resolveJavaTypeInAnnotations(psiType.componentType)
+                val componentTypeRef = createKSTypeReferenceFromKSType(componentType)
+                val typeArgs = listOf(getTypeArgument(componentTypeRef, Variance.INVARIANT))
+                builtIns.arrayType.replace(typeArgs)
+            }
+            else -> {
+                getClassDeclarationByName(psiType.canonicalText)?.asStarProjectedType()
+                    ?: KSErrorType(psiType.canonicalText)
+            }
+        }
+    }
+
     fun KotlinType.expandNonRecursively(): KotlinType =
         (constructor.declarationDescriptor as? TypeAliasDescriptor)?.expandedType?.withAbbreviation(this as SimpleType)
             ?: this
@@ -678,7 +731,7 @@ class ResolverImpl(
             is KSTypeReferenceImpl -> {
                 val typeReference = type.ktTypeReference
                 typeReference.lookup()?.let {
-                    return getKSTypeCached(it, type.element.typeArguments, type.annotations)
+                    return getKSTypeCached(it, type.element.typeArguments)
                 }
                 KtStubbedPsiUtil.getContainingDeclaration(typeReference)?.let { containingDeclaration ->
                     resolveDeclaration(containingDeclaration)?.let {
@@ -687,12 +740,12 @@ class ResolverImpl(
                     }
                     // TODO: Fix resolution look up to avoid fallback to file scope.
                     typeReference.lookup()?.let {
-                        return getKSTypeCached(it, type.element.typeArguments, type.annotations)
+                        return getKSTypeCached(it, type.element.typeArguments)
                     }
                 }
-                val scope = resolveSession.fileScopeProvider.getFileResolutionScope(typeReference.containingKtFile)
+                val scope = typeReference.findLexicalScope()
                 return resolveSession.typeResolver.resolveType(scope, typeReference, bindingTrace, false).let {
-                    getKSTypeCached(it, type.element.typeArguments, type.annotations)
+                    getKSTypeCached(it, type.element.typeArguments)
                 }
             }
             is KSTypeReferenceDescriptorImpl -> {
@@ -707,9 +760,7 @@ class ResolverImpl(
                         }
                     }
                     val containingDeclaration = if (psi.owner is PsiClass) {
-                        moduleClassResolver.resolveClass(
-                            JavaClassImpl(psi.owner as PsiClass).apply { workaroundForNested(lazyJavaResolverContext) }
-                        )
+                        moduleClassResolver.resolveClass(JavaClassImpl(psi.owner as PsiClass))
                     } else {
                         val owner = psi.owner
                         check(owner is PsiMethod) {
@@ -718,22 +769,29 @@ class ResolverImpl(
                         moduleClassResolver.resolveContainingClass(owner)
                             ?.findEnclosedDescriptor(
                                 kindFilter = DescriptorKindFilter.FUNCTIONS,
-                                filter = { it.findPsi() == owner }
+                                name = owner.name,
+                                filter = { it.correspondsTo(owner) }
                             ) as FunctionDescriptor
                     } as DeclarationDescriptor
-                    return getKSTypeCached(
-                        LazyJavaTypeParameterDescriptor(
-                            lazyJavaResolverContext,
-                            JavaTypeParameterImpl(psi),
-                            psi.index,
-                            containingDeclaration
-                        ).defaultType
+                    val typeParameterDescriptor = LazyJavaTypeParameterDescriptor(
+                        lazyJavaResolverContext,
+                        JavaTypeParameterImpl(psi),
+                        psi.index,
+                        containingDeclaration
                     )
+                    javaTypeParameterMap[typeParameterDescriptor] = psi
+                }
+                val resolved = getKSTypeCached(
+                    resolveJavaType(type.psi, type),
+                    type.element.typeArguments
+                )
+                return if (type.psi is PsiArrayType) {
+                    resolved
                 } else {
-                    return getKSTypeCached(
-                        resolveJavaType(type.psi, type),
-                        type.element.typeArguments, type.annotations
-                    )
+                    // Replacing with error argument results in error type, fall back to original logic.
+                    resolved.replace(type.element.typeArguments).let {
+                        if (it.isError) resolved else it
+                    }
                 }
             }
             else -> throw IllegalStateException("Unable to resolve type for $type, $ExceptionMessage")
@@ -743,18 +801,25 @@ class ResolverImpl(
     fun findDeclaration(kotlinType: KotlinType): KSDeclaration {
         val descriptor = kotlinType.constructor.declarationDescriptor
         val psi = descriptor?.findPsi()
-        return if (psi != null && psi !is KtTypeParameter) {
+        return if (psi != null) {
             when (psi) {
                 is KtClassOrObject -> KSClassDeclarationImpl.getCached(psi)
                 is PsiClass -> KSClassDeclarationJavaImpl.getCached(psi)
                 is KtTypeAlias -> KSTypeAliasImpl.getCached(psi)
+                is KtTypeParameter -> KSTypeParameterImpl.getCached(psi)
                 is PsiEnumConstant -> KSClassDeclarationJavaEnumEntryImpl.getCached(psi)
                 else -> throw IllegalStateException("Unexpected psi type: ${psi.javaClass}, $ExceptionMessage")
             }
         } else {
             when (descriptor) {
                 is ClassDescriptor -> KSClassDeclarationDescriptorImpl.getCached(descriptor)
-                is TypeParameterDescriptor -> KSTypeParameterDescriptorImpl.getCached(descriptor)
+                // LazyJavaTypeParameterDescriptor has `source` overridden to `NO_SOURCE`, therefore
+                // need to look up psi within KSP.
+                is TypeParameterDescriptor -> if (descriptor in javaTypeParameterMap) {
+                    KSTypeParameterJavaImpl.getCached(javaTypeParameterMap[descriptor]!!)
+                } else {
+                    KSTypeParameterDescriptorImpl.getCached(descriptor)
+                }
                 is TypeAliasDescriptor -> KSTypeAliasDescriptorImpl.getCached(descriptor)
                 null -> throw IllegalStateException("Failed to resolve descriptor for $kotlinType")
                 else -> throw IllegalStateException(
@@ -766,9 +831,26 @@ class ResolverImpl(
 
     // Finds closest non-local scope.
     fun KtElement.findLexicalScope(): LexicalScope {
-        return containingNonLocalDeclaration()?.let {
-            resolveSession.declarationScopeProvider.getResolutionScopeForDeclaration(it)
-        } ?: resolveSession.fileScopeProvider.getFileResolutionScope(this.containingKtFile)
+        val ktDeclaration = KtStubbedPsiUtil.getPsiOrStubParent(this, KtDeclaration::class.java, false)
+            ?: return resolveSession.fileScopeProvider.getFileResolutionScope(this.containingKtFile)
+        var parentDeclaration = KtStubbedPsiUtil.getContainingDeclaration(ktDeclaration)
+
+        if (ktDeclaration is KtPropertyAccessor && parentDeclaration != null) {
+            parentDeclaration = KtStubbedPsiUtil.getContainingDeclaration(
+                parentDeclaration,
+                KtDeclaration::class.java
+            )
+        }
+        if (parentDeclaration == null) {
+            return resolveSession.fileScopeProvider.getFileResolutionScope(this.containingKtFile)
+        }
+        return if (parentDeclaration is KtClassOrObject) {
+            resolveSession.declarationScopeProvider.getResolutionScopeForDeclaration(this)
+        } else {
+            containingNonLocalDeclaration()?.let {
+                resolveSession.declarationScopeProvider.getResolutionScopeForDeclaration(it)
+            } ?: resolveSession.fileScopeProvider.getFileResolutionScope(this.containingKtFile)
+        }
     }
 
     fun resolveAnnotationEntry(ktAnnotationEntry: KtAnnotationEntry): AnnotationDescriptor? {
@@ -810,22 +892,13 @@ class ResolverImpl(
 
     @KspExperimental
     override fun getJvmName(accessor: KSPropertyAccessor): String? {
-        val descriptor = resolvePropertyAccessorDeclaration(accessor)
-
-        return descriptor?.let {
-            // KotlinTypeMapper.mapSignature always uses OwnerKind.IMPLEMENTATION
-            typeMapper.mapFunctionName(descriptor, OwnerKind.IMPLEMENTATION)
-        }
+        return resolvePropertyAccessorDeclaration(accessor)?.let(typeMapper::mapFunctionName)
     }
 
     @KspExperimental
     override fun getJvmName(declaration: KSFunctionDeclaration): String? {
         // function names might be mangled if they receive inline class parameters or they are internal
-        val descriptor = resolveFunctionDeclaration(declaration)
-        return (descriptor as? FunctionDescriptor)?.let {
-            // KotlinTypeMapper.mapSignature always uses OwnerKind.IMPLEMENTATION
-            typeMapper.mapFunctionName(it, OwnerKind.IMPLEMENTATION)
-        }
+        return (resolveFunctionDeclaration(declaration) as? FunctionDescriptor)?.let(typeMapper::mapFunctionName)
     }
 
     @KspExperimental
@@ -841,52 +914,35 @@ class ResolverImpl(
     }
 
     private fun getJvmOwnerQualifiedName(descriptor: DeclarationDescriptor): String? {
-        return try {
-            typeMapper.mapImplementationOwner(descriptor).className
-        } catch (unsupported: UnsupportedOperationException) {
-            null
+        return typeMapper.mapJvmImplementationOwner(descriptor)?.className
+    }
+
+    private fun KotlinTypeMapper.mapJvmImplementationOwner(descriptor: DeclarationDescriptor): Type? {
+        if (descriptor is ConstructorDescriptor) {
+            return mapClass(descriptor.constructedClass)
+        }
+
+        return when (val container = descriptor.containingDeclaration) {
+            is PackageFragmentDescriptor ->
+                internalNameForPackageMemberOwner(descriptor as CallableMemberDescriptor)?.let(Type::getObjectType)
+            is ClassDescriptor ->
+                mapClass(container)
+            else -> null
         }
     }
 
-    private fun extractThrowsFromClassFile(
-        virtualFileContent: ByteArray,
-        jvmDesc: String?,
-        simpleName: String?
-    ): Sequence<KSType> {
-        val exceptionNames = mutableListOf<String>()
-        ClassReader(virtualFileContent).accept(
-            object : ClassVisitor(API_VERSION) {
-                override fun visitMethod(
-                    access: Int,
-                    name: String?,
-                    descriptor: String?,
-                    signature: String?,
-                    exceptions: Array<out String>?,
-                ): MethodVisitor {
-                    if (name == simpleName && jvmDesc == descriptor) {
-                        exceptions?.toList()?.let { exceptionNames.addAll(it) }
-                    }
-                    return object : MethodVisitor(API_VERSION) {
-                    }
-                }
-            },
-            ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES
-        )
-        return exceptionNames.mapNotNull {
-            this@ResolverImpl.getClassDeclarationByName(it.replace("/", "."))?.asStarProjectedType()
-        }.asSequence()
-    }
+    private fun internalNameForPackageMemberOwner(descriptor: CallableMemberDescriptor): String? {
+        val file = DescriptorToSourceUtils.getContainingFile(descriptor)
+        if (file != null) {
+            return JvmFileClassUtil.getFileClassInternalName(file)
+        }
 
-    @SuppressWarnings("UNCHECKED_CAST")
-    private fun extractThrowsAnnotation(annotated: KSAnnotated): Sequence<KSType> {
-        return annotated.annotations
-            .singleOrNull {
-                it.shortName.asString() == "Throws" &&
-                    it.annotationType.resolve().declaration.qualifiedName?.asString() == "kotlin.Throws"
-            }?.arguments
-            ?.singleOrNull()
-            ?.let { it.value as? ArrayList<KSType> }
-            ?.asSequence() ?: emptySequence()
+        val directMember = DescriptorUtils.getDirectMember(descriptor)
+        if (directMember is DescriptorWithContainerSource) {
+            return directMember.getImplClassNameForDeserialized()?.internalName
+        }
+
+        return null
     }
 
     // TODO: refactor and reuse BinaryClassInfoCache
@@ -895,7 +951,8 @@ class ResolverImpl(
         return when (function.origin) {
             Origin.JAVA -> {
                 val psi = (function as KSFunctionDeclarationJavaImpl).psi
-                psi.throwsList.referencedTypes.asSequence().map { getKSTypeCached(resolveJavaType(it)) }
+                psi.throwsList.referencedTypes.asSequence()
+                    .map { KSTypeReferenceJavaImpl.getCached(it, function).resolve() }
             }
             Origin.KOTLIN -> {
                 extractThrowsAnnotation(function)
@@ -1024,7 +1081,7 @@ class ResolverImpl(
             }
         }
         // if substitution fails, fallback to the type from the property
-        return KSErrorType
+        return KSErrorType.fromReferenceBestEffort(property.type)
     }
 
     internal fun asMemberOf(
@@ -1119,8 +1176,6 @@ class ResolverImpl(
     internal val javaSerializableType = module.resolveClassByFqName(
         FqName("java.io.Serializable"), NoLookupLocation.WHEN_FIND_BY_FQNAME
     )?.defaultType
-
-    private fun ClassId.toKSName() = KSNameImpl.getCached(asSingleFqName().toString())
 
     @KspExperimental
     override fun mapJavaNameToKotlin(javaName: KSName): KSName? =
@@ -1218,69 +1273,8 @@ class ResolverImpl(
         return modifiers
     }
 
-    private enum class RefPosition {
-        PARAMETER_TYPE,
-        RETURN_TYPE,
-        SUPER_TYPE
-    }
-
-    // Search in self and parents for the first type reference that is not part of a type argument.
-    private fun KSTypeReference.findOuterMostRef(): Pair<KSTypeReference, List<Int>> {
-        fun KSNode.findParentRef(): KSTypeReference? {
-            var parent = parent
-            while (parent != null && parent !is KSTypeReference)
-                parent = parent.parent
-            return parent as? KSTypeReference
-        }
-
-        val fallback = Pair<KSTypeReference, List<Int>>(this, emptyList())
-        val indexes = mutableListOf<Int>()
-        var candidate: KSTypeReference = this
-        // KSTypeArgument's parent can be either KSReferenceElement or KSType.
-        while (candidate.parent is KSTypeArgument) {
-            // If the parent is a KSType, it's a synthetic reference.
-            // Do nothing and reply on the fallback behavior.
-            val referenceElement = (candidate.parent!!.parent as? KSReferenceElement) ?: return fallback
-            indexes.add(referenceElement.typeArguments.indexOf(candidate.parent))
-            // In case the program isn't properly structured, fallback.
-            candidate = referenceElement.findParentRef() ?: return fallback
-        }
-        return Pair(candidate, indexes)
-    }
-
-    // TODO: Strict mode for catching unhandled cases.
-    private fun findRefPosition(ref: KSTypeReference): RefPosition = when (val parent = ref.parent) {
-        is KSCallableReference -> when (ref) {
-            parent.returnType -> RefPosition.RETURN_TYPE
-            else -> RefPosition.PARAMETER_TYPE
-        }
-        is KSFunctionDeclaration -> when (ref) {
-            parent.returnType -> RefPosition.RETURN_TYPE
-            else -> RefPosition.PARAMETER_TYPE
-        }
-        is KSPropertyGetter -> RefPosition.RETURN_TYPE
-        is KSPropertyDeclaration -> when (ref) {
-            parent.type -> RefPosition.RETURN_TYPE
-            else -> RefPosition.PARAMETER_TYPE
-        }
-        is KSClassDeclaration -> RefPosition.SUPER_TYPE
-        // is KSTypeArgument -> RefPosition.PARAMETER_TYPE
-        // is KSAnnotation -> RefPosition.PARAMETER_TYPE
-        // is KSTypeAlias -> RefPosition.PARAMETER_TYPE
-        // is KSValueParameter -> RefPosition.PARAMETER_TYPE
-        // is KSTypeParameter -> RefPosition.PARAMETER_TYPE
-        else -> RefPosition.PARAMETER_TYPE
-    }
-
-    private fun KSTypeReference.isReturnTypeOfAnnotationMethod(): Boolean {
-        var candidate = this.parent
-        while (candidate !is KSClassDeclaration && candidate != null)
-            candidate = candidate.parent
-        return (candidate as? KSClassDeclaration)?.classKind == ClassKind.ANNOTATION_CLASS
-    }
-
     // Convert type arguments for Java wildcard, recursively.
-    private fun KotlinType.toWildcard(mode: TypeMappingMode): KotlinType? {
+    private fun KotlinType.toWildcard(mode: TypeMappingMode): Result<KotlinType> {
         val parameters = constructor.parameters
         val arguments = arguments
 
@@ -1290,9 +1284,12 @@ class ResolverImpl(
                 parameter.variance != org.jetbrains.kotlin.types.Variance.INVARIANT &&
                 argument.projectionKind != org.jetbrains.kotlin.types.Variance.INVARIANT
             ) {
-                // conflicting variances
-                // TODO: error message
-                return null
+                return Result.failure(
+                    IllegalArgumentException(
+                        "Conflicting variance: variance '${parameter.variance.label}' vs projection " +
+                            "'${argument.projectionKind.label}'"
+                    )
+                )
             }
 
             val argMode = mode.updateFromAnnotations(argument.type)
@@ -1300,10 +1297,10 @@ class ResolverImpl(
             val genericMode = argMode.toGenericArgumentMode(
                 getEffectiveVariance(parameter.variance, argument.projectionKind)
             )
-            TypeProjectionImpl(variance, argument.type.toWildcard(genericMode) ?: return null)
+            TypeProjectionImpl(variance, argument.type.toWildcard(genericMode).getOrElse { return Result.failure(it) })
         }
 
-        return replace(wildcardArguments)
+        return Result.success(replace(wildcardArguments))
     }
 
     private val JVM_SUPPRESS_WILDCARDS_NAME = KSNameImpl.getCached("kotlin.jvm.JvmSuppressWildcards")
@@ -1392,29 +1389,32 @@ class ResolverImpl(
             RefPosition.PARAMETER_TYPE -> typeSystem.getOptimalModeForValueParameter(kotlinType)
             RefPosition.RETURN_TYPE ->
                 typeSystem.getOptimalModeForReturnType(kotlinType, ref.isReturnTypeOfAnnotationMethod())
+
             RefPosition.SUPER_TYPE -> TypeMappingMode.SUPER_TYPE
         }.updateFromParents(ref)
 
-        val parameters = kotlinType.constructor.parameters
-        val arguments = kotlinType.arguments
-
-        parameters.zip(arguments).forEach { (parameter, argument) ->
+        kotlinType.arguments.forEach { argument ->
             if (position == RefPosition.SUPER_TYPE &&
                 argument.projectionKind != org.jetbrains.kotlin.types.Variance.INVARIANT
             ) {
-                // Type projection isn't allowed in immediate arguments to supertypes.
-                // TODO: error message
-                return KSTypeReferenceSyntheticImpl.getCached(KSErrorType, null)
+                val errorType = KSErrorType(
+                    name = type.toString(),
+                    message = "Type projection isn't allowed in immediate arguments to supertypes"
+                )
+                return KSTypeReferenceSyntheticImpl.getCached(errorType, null)
             }
         }
 
-        val wildcardType = kotlinType.toWildcard(typeMappingMode)?.let {
-            var candidate: KotlinType = it
+        val wildcardType = kotlinType.toWildcard(typeMappingMode).let {
+            var candidate: KotlinType = it.getOrElse { error ->
+                val errorType = KSErrorType(name = type.toString(), message = error.message)
+                return KSTypeReferenceSyntheticImpl.getCached(errorType, null)
+            }
             for (i in indexes.reversed()) {
                 candidate = candidate.arguments[i].type
             }
             getKSTypeCached(candidate)
-        } ?: KSErrorType
+        }
 
         return KSTypeReferenceSyntheticImpl.getCached(wildcardType, null)
     }
@@ -1424,11 +1424,64 @@ class ResolverImpl(
         return type is KSTypeImpl && type.kotlinType.unwrap() is RawType
     }
 
+    @KspExperimental
+    override fun getPackageAnnotations(packageName: String): Sequence<KSAnnotation> {
+        return packageInfoFiles.singleOrNull { it.packageName.asString() == packageName }
+            ?.getPackageAnnotations()?.asSequence() ?: emptySequence()
+    }
+
+    @KspExperimental
+    override fun getPackagesWithAnnotation(annotationName: String): Sequence<String> {
+        return packageInfoFiles.filter {
+            it.getPackageAnnotations().any {
+                (it.annotationType.element as? KSClassifierReference)?.referencedName()
+                    ?.substringAfterLast(".") == annotationName.substringAfterLast(".") &&
+                    it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationName
+            }
+        }.map { it.packageName.asString() }
+    }
+
+    @KspExperimental
+    override fun getModuleName(): KSName = KSNameImpl.getCached(moduleIdentifier)
+
     private val psiJavaFiles = allKSFiles.filterIsInstance<KSFileJavaImpl>().map {
         Pair(it.psi.virtualFile.path, it.psi)
     }.toMap()
 
     internal fun findPsiJavaFile(path: String): PsiFile? = psiJavaFiles.get(path)
+
+    // Always construct the key on the fly, so that it and value can be reclaimed any time.
+    private val contributedDescriptorsCache =
+        WeakHashMap<Pair<MemberScope, DescriptorKindFilter>, Map<String, List<DeclarationDescriptor>>>()
+
+    private inline fun MemberScope.findEnclosedDescriptor(
+        kindFilter: DescriptorKindFilter,
+        name: String,
+        crossinline filter: (DeclarationDescriptor) -> Boolean,
+    ): DeclarationDescriptor? {
+        val nameToDescriptors = contributedDescriptorsCache.computeIfAbsent(Pair(this, kindFilter)) {
+            getContributedDescriptors(kindFilter).groupBy { it.name.asString() }
+        }
+        return nameToDescriptors.get(name)?.firstOrNull(filter)
+    }
+
+    private inline fun ClassDescriptor.findEnclosedDescriptor(
+        kindFilter: DescriptorKindFilter,
+        name: String,
+        crossinline filter: (DeclarationDescriptor) -> Boolean,
+    ): DeclarationDescriptor? {
+        return this.unsubstitutedMemberScope.findEnclosedDescriptor(
+            kindFilter = kindFilter,
+            name = name,
+            filter = filter
+        ) ?: this.staticScope.findEnclosedDescriptor(
+            kindFilter = kindFilter,
+            name = name,
+            filter = filter
+        ) ?: constructors.firstOrNull {
+            kindFilter.accepts(it) && filter(it)
+        }
+    }
 }
 
 // TODO: cross module resolution
@@ -1456,6 +1509,7 @@ fun MemberDescriptor.toKSDeclaration(): KSDeclaration =
             is ClassDescriptor -> KSClassDeclarationDescriptorImpl.getCached(this)
             is FunctionDescriptor -> KSFunctionDeclarationDescriptorImpl.getCached(this)
             is PropertyDescriptor -> KSPropertyDeclarationDescriptorImpl.getCached(this)
+            is TypeAliasDescriptor -> KSTypeAliasDescriptorImpl.getCached(this)
             else -> throw IllegalStateException("Unknown expect/actual implementation")
         }
     }
@@ -1492,30 +1546,6 @@ private fun Name.getNonSpecialIdentifier(): String {
         asString().substring(1, asString().length - 1)
     } else {
         asString().substring(1)
-    }
-}
-
-private inline fun MemberScope.findEnclosedDescriptor(
-    kindFilter: DescriptorKindFilter,
-    crossinline filter: (DeclarationDescriptor) -> Boolean,
-): DeclarationDescriptor? {
-    return getContributedDescriptors(
-        kindFilter = kindFilter
-    ).firstOrNull(filter)
-}
-
-private inline fun ClassDescriptor.findEnclosedDescriptor(
-    kindFilter: DescriptorKindFilter,
-    crossinline filter: (DeclarationDescriptor) -> Boolean,
-): DeclarationDescriptor? {
-    return this.unsubstitutedMemberScope.findEnclosedDescriptor(
-        kindFilter = kindFilter,
-        filter = filter
-    ) ?: this.staticScope.findEnclosedDescriptor(
-        kindFilter = kindFilter,
-        filter = filter
-    ) ?: constructors.firstOrNull {
-        kindFilter.accepts(it) && filter(it)
     }
 }
 
@@ -1565,17 +1595,4 @@ internal fun KSTypeReference.resolveToUnderlying(): KSType {
         declaration = candidate.declaration
     }
     return candidate
-}
-
-// TODO: Remove this after upgrading to Kotlin 1.8.20.
-// Temporary work around for https://github.com/google/ksp/issues/1034
-// Force resolve outer most class for Java nested classes.
-internal fun JavaClass.workaroundForNested(
-    lazyJavaResolverContext: LazyJavaResolverContext = ResolverImpl.instance!!.lazyJavaResolverContext
-) {
-    var outerMost = outerClass
-    while (outerMost?.outerClass != null) {
-        outerMost = outerMost.outerClass
-    }
-    outerMost?.classId?.let { lazyJavaResolverContext.components.finder.findClass(it) }
 }

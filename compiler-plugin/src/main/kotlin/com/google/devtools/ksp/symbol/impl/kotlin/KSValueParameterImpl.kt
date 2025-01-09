@@ -17,20 +17,23 @@
 
 package com.google.devtools.ksp.symbol.impl.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
-import com.google.devtools.ksp.memoized
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.common.impl.KSTypeReferenceSyntheticImpl
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.findAnnotationFromUseSiteTarget
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSName
 import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Origin
-import com.google.devtools.ksp.symbol.impl.synthetic.KSTypeReferenceSyntheticImpl
 import com.google.devtools.ksp.symbol.impl.toLocation
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
 import org.jetbrains.kotlin.lexer.KtTokens.CROSSINLINE_KEYWORD
 import org.jetbrains.kotlin.lexer.KtTokens.NOINLINE_KEYWORD
 import org.jetbrains.kotlin.psi.KtAnnotationEntry
@@ -69,7 +72,23 @@ class KSValueParameterImpl private constructor(val ktParameter: KtParameter) : K
     }
 
     override val annotations: Sequence<KSAnnotation> by lazy {
-        ktParameter.filterUseSiteTargetAnnotations().map { KSAnnotationImpl.getCached(it) }
+        ktParameter.annotationEntries.asSequence().filter { annotation ->
+            annotation.useSiteTarget?.getAnnotationUseSiteTarget()?.let {
+                it != AnnotationUseSiteTarget.PROPERTY_GETTER &&
+                    it != AnnotationUseSiteTarget.PROPERTY_SETTER &&
+                    it != AnnotationUseSiteTarget.SETTER_PARAMETER &&
+                    it != AnnotationUseSiteTarget.FIELD
+            } ?: true
+        }.map { KSAnnotationImpl.getCached(it) }.filterNot { valueParameterAnnotation ->
+            valueParameterAnnotation.annotationType.resolve().declaration.annotations.any { metaAnnotation ->
+                metaAnnotation.annotationType.resolve().declaration.qualifiedName
+                    ?.asString() == "kotlin.annotation.Target" &&
+                    (metaAnnotation.arguments.singleOrNull()?.value as? ArrayList<*>)?.none {
+                    (it as? KSType)?.declaration?.qualifiedName
+                        ?.asString() == "kotlin.annotation.AnnotationTarget.VALUE_PARAMETER"
+                } ?: false
+            }
+        }
             .plus(this.findAnnotationFromUseSiteTarget()).memoized()
     }
 
@@ -93,7 +112,8 @@ class KSValueParameterImpl private constructor(val ktParameter: KtParameter) : K
 
     override val type: KSTypeReference by lazy {
         ktParameter.typeReference?.let { KSTypeReferenceImpl.getCached(it) }
-            ?: findPropertyForAccessor()?.type ?: KSTypeReferenceSyntheticImpl.getCached(KSErrorType, this)
+            ?: findPropertyForAccessor()?.type
+            ?: KSTypeReferenceSyntheticImpl.getCached(KSErrorType(null /* no info available */), this)
     }
 
     override val hasDefault: Boolean = ktParameter.hasDefaultValue()

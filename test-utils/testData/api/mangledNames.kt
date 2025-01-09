@@ -19,83 +19,85 @@
 // TEST PROCESSOR: MangledNamesProcessor
 // EXPECTED:
 // JavaEnum -> declarations
+// <init> -> <init>
 // JavaEnum.VAL1 -> declarations
 // JavaEnum.VAL2 -> declarations
-// values -> values
 // valueOf -> valueOf
-// <init> -> <init>
+// values -> values
 // JavaInput -> declarations
-// javaFunction -> javaFunction
-// staticJavaFunction -> staticJavaFunction
 // getX -> getX
 // getY -> getY
+// javaFunction -> javaFunction
 // setY -> setY
+// staticJavaFunction -> staticJavaFunction
+// mainPackage.AbstractKotlinClass -> declarations
+// get-abstractVal -> getAbstractVal
+// get-abstractVar -> getAbstractVar
+// set-abstractVar -> setAbstractVar
+// get-internalAbstractVal -> getInternalAbstractVal$mainModule_abc
+// set-internalAbstractVal -> setInternalAbstractVal$mainModule_abc
+// get-internalAbstractVar -> getInternalAbstractVar$mainModule_abc
+// set-internalAbstractVar -> setInternalAbstractVar$mainModule_abc
+// mainPackage.Anno -> declarations
+// get-a -> a
 // mainPackage.Foo -> declarations
-// get-normalProp -> getNormalProp
-// set-normalProp -> setNormalProp
+// hasJvmName -> explicitJvmName
 // get-inlineProp -> getInlineProp-HRn7Rpw
 // set-inlineProp -> setInlineProp-E03SJzc
-// get-internalProp -> getInternalProp$mainModule
-// set-internalProp -> setInternalProp$mainModule
-// get-internalInlineProp -> getInternalInlineProp-HRn7Rpw$mainModule
-// set-internalInlineProp -> setInternalInlineProp-E03SJzc$mainModule
+// inlineReceivingFun -> inlineReceivingFun-E03SJzc
+// inlineReturningFun -> inlineReturningFun-HRn7Rpw
+// get-internalInlineProp -> getInternalInlineProp-HRn7Rpw$mainModule_abc
+// set-internalInlineProp -> setInternalInlineProp-E03SJzc$mainModule_abc
+// internalInlineReceivingFun -> internalInlineReceivingFun-E03SJzc$mainModule_abc
+// internalInlineReturningFun -> internalInlineReturningFun-HRn7Rpw$mainModule_abc
+// get-internalProp -> getInternalProp$mainModule_abc
+// set-internalProp -> setInternalProp$mainModule_abc
 // get-jvmNameProp -> explicitGetterName
 // set-jvmNameProp -> explicitSetterName
 // normalFun -> normalFun
-// hasJvmName -> explicitJvmName
-// inlineReceivingFun -> inlineReceivingFun-E03SJzc
-// inlineReturningFun -> inlineReturningFun-HRn7Rpw
-// internalInlineReceivingFun -> internalInlineReceivingFun-E03SJzc$mainModule
-// internalInlineReturningFun -> internalInlineReturningFun-HRn7Rpw$mainModule
-// mainPackage.AbstractKotlinClass -> declarations
-// get-abstractVar -> getAbstractVar
-// set-abstractVar -> setAbstractVar
-// get-abstractVal -> getAbstractVal
-// get-internalAbstractVar -> getInternalAbstractVar$mainModule
-// set-internalAbstractVar -> setInternalAbstractVar$mainModule
-// get-internalAbstractVal -> getInternalAbstractVal$mainModule
-// set-internalAbstractVal -> setInternalAbstractVal$mainModule
-// fileLevelInternalFun -> fileLevelInternalFun
-// fileLevelInlineReceivingFun -> fileLevelInlineReceivingFun-E03SJzc
-// fileLevelInlineReturningFun -> fileLevelInlineReturningFun
-// fileLevelInternalInlineReceivingFun -> fileLevelInternalInlineReceivingFun-E03SJzc
-// fileLevelInternalInlineReturningFun -> fileLevelInternalInlineReturningFun
+// get-normalProp -> getNormalProp
+// set-normalProp -> setNormalProp
 // mainPackage.MyInterface -> declarations
 // get-x -> getX
 // get-y -> getY
 // set-y -> setY
+// fileLevelInlineReceivingFun -> fileLevelInlineReceivingFun-E03SJzc
+// fileLevelInlineReturningFun -> fileLevelInlineReturningFun
+// fileLevelInternalFun -> fileLevelInternalFun
+// fileLevelInternalInlineReceivingFun -> fileLevelInternalInlineReceivingFun-E03SJzc
+// fileLevelInternalInlineReturningFun -> fileLevelInternalInlineReturningFun
 // libPackage.Foo -> declarations
+// <init> -> <init>
+// hasJvmName -> explicitJvmName
 // get-inlineProp -> getInlineProp-b_MPbnQ
 // set-inlineProp -> setInlineProp-mQ73O9w
-// get-internalInlineProp -> getInternalInlineProp-b_MPbnQ$lib
-// set-internalInlineProp -> setInternalInlineProp-mQ73O9w$lib
-// get-internalProp -> getInternalProp$lib
-// set-internalProp -> setInternalProp$lib
-// get-jvmNameProp -> explicitGetterName
-// set-jvmNameProp -> explicitSetterName
-// get-normalProp -> getNormalProp
-// set-normalProp -> setNormalProp
-// hasJvmName -> explicitJvmName
 // inlineReceivingFun -> inlineReceivingFun-mQ73O9w
 // inlineReturningFun -> inlineReturningFun-b_MPbnQ
-// internalInlineReceivingFun -> internalInlineReceivingFun-mQ73O9w$lib
-// internalInlineReturningFun -> internalInlineReturningFun-b_MPbnQ$lib
+// get-internalInlineProp -> getInternalInlineProp-b_MPbnQ$lib_xyz
+// set-internalInlineProp -> setInternalInlineProp-mQ73O9w$lib_xyz
+// internalInlineReceivingFun -> internalInlineReceivingFun-mQ73O9w$lib_xyz
+// internalInlineReturningFun -> internalInlineReturningFun-b_MPbnQ$lib_xyz
+// get-internalProp -> getInternalProp$lib_xyz
+// set-internalProp -> setInternalProp$lib_xyz
+// get-jvmNameProp -> explicitGetterName
+// set-jvmNameProp -> explicitSetterName
 // normalFun -> normalFun
-// <init> -> <init>
+// get-normalProp -> getNormalProp
+// set-normalProp -> setNormalProp
 // libPackage.AbstractKotlinClass -> declarations
 // get-abstractVal -> getAbstractVal
 // get-abstractVar -> getAbstractVar
 // set-abstractVar -> setAbstractVar
-// get-internalAbstractVal -> getInternalAbstractVal$lib
-// set-internalAbstractVal -> setInternalAbstractVal$lib
-// get-internalAbstractVar -> getInternalAbstractVar$lib
-// set-internalAbstractVar -> setInternalAbstractVar$lib
+// get-internalAbstractVal -> getInternalAbstractVal$lib_xyz
+// set-internalAbstractVal -> setInternalAbstractVal$lib_xyz
+// get-internalAbstractVar -> getInternalAbstractVar$lib_xyz
+// set-internalAbstractVar -> setInternalAbstractVar$lib_xyz
 // libPackage.MyInterface -> declarations
 // get-x -> getX
 // get-y -> getY
 // set-y -> setY
 // END
-// MODULE: lib
+// MODULE: lib.xyz
 // FILE: input.kt
 /**
  * control group
@@ -130,7 +132,7 @@ interface MyInterface {
     val x:Int
     var y:Int
 }
-// MODULE: mainModule(lib)
+// MODULE: mainModule.abc(lib.xyz)
 // FILE: input.kt
 package mainPackage;
 inline class Inline1(val value:String)
@@ -151,6 +153,7 @@ class Foo {
     internal fun internalInlineReturningFun(): Inline1 = TODO()
 }
 
+annotation class Anno(val a: String)
 abstract class AbstractKotlinClass {
     abstract var abstractVar:String
     abstract val abstractVal:String

@@ -20,6 +20,8 @@
 // LCls;
 // a: I
 // foo: ()Ljava/lang/String;
+// f: ()I
+// g: ()I
 // <init>: ()V
 // LJavaIntefaceWithVoid;
 // getVoid: ()Ljava/lang/Void;
@@ -28,13 +30,28 @@
 // LJavaAnno;
 // intParam: I
 // <init>: (I)V
+// LJavaEnum;
+// VAL1: LJavaEnum;
+// VAL2: LJavaEnum;
+// DEFAULT: LJavaEnum;
+// values: ()[LJavaEnum;
+// valueOf: (Ljava/lang/String;)LJavaEnum;
+// <init>: (Ljava/lang/String;I)V
 // END
 
 // FILE: Cls.kt
+@JvmInline
+value class MyInlineClass(val value: Int)
+
 class Cls {
     val a: Int = 1
 
     fun foo(): String { return "1" }
+
+    @JvmName("f")
+    fun f(): MyInlineClass = TODO()
+
+    fun g(): MyInlineClass = TODO()
 }
 
 // FILE: JavaIntefaceWithVoid.java
@@ -50,4 +67,11 @@ class JavaClass {
 // FILE: JavaAnno.java
 @interface JavaAnno {
     int intParam();
+}
+
+// FILE: JavaEnum.java
+public enum JavaEnum {
+    VAL1,
+    VAL2,
+    DEFAULT
 }

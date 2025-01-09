@@ -23,18 +23,21 @@ import org.gradle.testkit.runner.TaskOutcome
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 
-class AndroidIncrementalIT {
+@RunWith(Parameterized::class)
+class AndroidIncrementalIT(useKSP2: Boolean) {
     @Rule
     @JvmField
-    val project: TemporaryTestProject = TemporaryTestProject("playground-android-multi", "playground")
+    val project: TemporaryTestProject = TemporaryTestProject("playground-android-multi", "playground", useKSP2)
 
-    @Test
-    fun testPlaygroundAndroid() {
+    private fun testWithExtraFlags(vararg extras: String) {
         val gradleRunner = GradleRunner.create().withProjectDir(project.root)
 
         gradleRunner.withArguments(
+            *extras,
             "clean", ":application:compileDebugKotlin", "--configuration-cache-problems=warn", "--debug", "--stacktrace"
         ).build().let { result ->
             Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:compileDebugKotlin")?.outcome)
@@ -51,6 +54,7 @@ class AndroidIncrementalIT {
         }
 
         gradleRunner.withArguments(
+            *extras,
             ":application:compileDebugKotlin", "--configuration-cache-problems=warn", "--debug", "--stacktrace"
         ).build().let { result ->
             Assert.assertEquals(
@@ -58,5 +62,21 @@ class AndroidIncrementalIT {
                 BuildResultFixture(result).compiledKotlinSources,
             )
         }
+    }
+
+    @Test
+    fun testPlaygroundAndroid() {
+        testWithExtraFlags()
+    }
+
+    @Test
+    fun testPlaygroundAndroidUseClasspathSnapshotFalse() {
+        testWithExtraFlags("-Pkotlin.incremental.useClasspathSnapshot=false")
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "KSP2={0}")
+        fun params() = listOf(arrayOf(true), arrayOf(false))
     }
 }

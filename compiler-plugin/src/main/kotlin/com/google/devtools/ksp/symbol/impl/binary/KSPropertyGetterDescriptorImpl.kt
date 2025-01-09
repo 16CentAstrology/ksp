@@ -17,7 +17,7 @@
 
 package com.google.devtools.ksp.symbol.impl.binary
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.descriptors.PropertyGetterDescriptor
 
@@ -36,6 +36,9 @@ class KSPropertyGetterDescriptorImpl private constructor(descriptor: PropertyGet
             null
         }
     }
+
+    override val declarations: Sequence<KSDeclaration>
+        get() = emptySequence()
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitPropertyGetter(this, data)

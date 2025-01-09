@@ -4,12 +4,15 @@ import org.gradle.testkit.runner.GradleRunner
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 
-class OnErrorIT {
+@RunWith(Parameterized::class)
+class OnErrorIT(useKSP2: Boolean) {
     @Rule
     @JvmField
-    val project: TemporaryTestProject = TemporaryTestProject("on-error")
+    val project: TemporaryTestProject = TemporaryTestProject("on-error", useKSP2 = useKSP2)
 
     @Test
     fun testOnError() {
@@ -74,7 +77,7 @@ class OnErrorIT {
 
     @Test
     fun testCreateTwice() {
-        val gradleRunner = GradleRunner.create().withProjectDir(project.root).withDebug(true)
+        val gradleRunner = GradleRunner.create().withProjectDir(project.root)
 
         File(project.root, "workload/build.gradle.kts").appendText("\nksp { arg(\"exception\", \"createTwice\") }\n")
         gradleRunner.withArguments("clean", "assemble").buildAndFail().let { result ->
@@ -93,7 +96,7 @@ class OnErrorIT {
 
     @Test
     fun testCreateTwiceNotOkOnError() {
-        val gradleRunner = GradleRunner.create().withProjectDir(project.root).withDebug(true)
+        val gradleRunner = GradleRunner.create().withProjectDir(project.root)
 
         File(project.root, "workload/build.gradle.kts").appendText("\nksp { arg(\"exception\", \"createTwice\") }\n")
         File(project.root, "gradle.properties").appendText("\nksp.return.ok.on.error=false")
@@ -107,5 +110,11 @@ class OnErrorIT {
             )
         }
         project.restore("workload/build.gradle.kts")
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "KSP2={0}")
+        fun params() = listOf(arrayOf(true), arrayOf(false))
     }
 }

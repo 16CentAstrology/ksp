@@ -14,10 +14,10 @@ class TestProcessor(val codeGenerator: CodeGenerator, val logger: KSPLogger) : S
         }
         invoked = true
 
-        codeGenerator.createNewFile(Dependencies(false), "", "Foo", "kt").use { output ->
+        codeGenerator.createNewFile(Dependencies.ALL_FILES, "", "Foo", "kt").use { output ->
             OutputStreamWriter(output).use { writer ->
                 writer.write("package com.example\n\n")
-                writer.write("class Foo {\n")
+                writer.write("actual class Foo {\n")
 
                 val visitor = ClassVisitor()
                 resolver.getAllFiles().forEach {
@@ -40,13 +40,13 @@ class ClassVisitor : KSTopDownVisitor<OutputStreamWriter, Unit>() {
         data: OutputStreamWriter
     ) {
         super.visitClassDeclaration(classDeclaration, data)
-        val symbolName = classDeclaration.simpleName.asString().toLowerCase()
-        data.write("    val $symbolName = true\n")
+        val symbolName = classDeclaration.simpleName.asString().lowercase()
+        data.write("    actual val $symbolName = true\n")
     }
 }
 
 class TestProcessorProvider : SymbolProcessorProvider {
-    override fun create(env: SymbolProcessorEnvironment): SymbolProcessor {
-        return TestProcessor(env.codeGenerator, env.logger)
+    override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
+        return TestProcessor(environment.codeGenerator, environment.logger)
     }
 }

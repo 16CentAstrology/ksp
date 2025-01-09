@@ -15,27 +15,51 @@
  * limitations under the License.
  */
 
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
 import com.google.devtools.ksp.symbol.*
-import org.jetbrains.kotlin.analysis.api.symbols.KtValueParameterSymbol
+import org.jetbrains.kotlin.analysis.api.fir.symbols.KaFirValueParameterSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaValueParameterSymbol
+import org.jetbrains.kotlin.fir.java.JavaTypeParameterStack
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter
+import org.jetbrains.kotlin.fir.java.resolveIfJavaType
+import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.psi.KtParameter
 
 class KSValueParameterImpl private constructor(
-    private val ktValueParameterSymbol: KtValueParameterSymbol,
+    private val ktValueParameterSymbol: KaValueParameterSymbol,
     override val parent: KSAnnotated
-) : KSValueParameter {
-    companion object : KSObjectCache<KtValueParameterSymbol, KSValueParameterImpl>() {
-        fun getCached(ktValueParameterSymbol: KtValueParameterSymbol, parent: KSAnnotated) =
+) : KSValueParameter, Deferrable {
+    companion object : KSObjectCache<KaValueParameterSymbol, KSValueParameterImpl>() {
+        fun getCached(ktValueParameterSymbol: KaValueParameterSymbol, parent: KSAnnotated) =
             cache.getOrPut(ktValueParameterSymbol) { KSValueParameterImpl(ktValueParameterSymbol, parent) }
     }
 
     override val name: KSName? by lazy {
-        KSNameImpl.getCached(ktValueParameterSymbol.name.asString())
+        if (origin == Origin.SYNTHETIC && parent is KSPropertySetter) {
+            KSNameImpl.getCached("value")
+        } else {
+            KSNameImpl.getCached(ktValueParameterSymbol.name.asString())
+        }
     }
 
+    @OptIn(SymbolInternals::class)
     override val type: KSTypeReference by lazy {
-        KSTypeReferenceImpl.getCached(ktValueParameterSymbol.returnType, this@KSValueParameterImpl)
+        // FIXME: temporary workaround before upstream fixes java type refs.
+        if (origin == Origin.JAVA || origin == Origin.JAVA_LIB) {
+            ((ktValueParameterSymbol as KaFirValueParameterSymbol).firSymbol.fir as? FirJavaValueParameter)?.let {
+                // can't get containing class for FirJavaValueParameter, using empty stack for now.
+                it.returnTypeRef =
+                    it.returnTypeRef.resolveIfJavaType(it.moduleData.session, JavaTypeParameterStack.EMPTY, null)
+            }
+        }
+        (ktValueParameterSymbol.psiIfSource() as? KtParameter)?.typeReference
+            ?.let { KSTypeReferenceImpl.getCached(it, this) }
+            ?: KSTypeReferenceResolvedImpl.getCached(ktValueParameterSymbol.returnType, this@KSValueParameterImpl)
     }
 
     override val isVararg: Boolean by lazy {
@@ -43,29 +67,31 @@ class KSValueParameterImpl private constructor(
     }
 
     override val isNoInline: Boolean
-        get() = TODO("Not yet implemented")
+        get() = ktValueParameterSymbol.isNoinline
 
     override val isCrossInline: Boolean
-        get() = TODO("Not yet implemented")
+        get() = ktValueParameterSymbol.isCrossinline
 
     override val isVal: Boolean
-        get() = TODO("Not yet implemented")
+        get() = (ktValueParameterSymbol.psi as? KtParameter)?.let { it.hasValOrVar() && !it.isMutable } ?: false
 
     override val isVar: Boolean
-        get() = TODO("Not yet implemented")
+        get() = (ktValueParameterSymbol.psi as? KtParameter)?.let { it.hasValOrVar() && it.isMutable } ?: false
 
     override val hasDefault: Boolean by lazy {
         ktValueParameterSymbol.hasDefaultValue
     }
 
     override val annotations: Sequence<KSAnnotation> by lazy {
-        (
-            ktValueParameterSymbol.generatedPrimaryConstructorProperty?.annotations()
-                ?: ktValueParameterSymbol.annotations()
-            ).plus(findAnnotationFromUseSiteTarget())
+        ktValueParameterSymbol.annotations(this).plus(findAnnotationFromUseSiteTarget())
     }
     override val origin: Origin by lazy {
-        mapAAOrigin(ktValueParameterSymbol.origin)
+        val symbolOrigin = mapAAOrigin(ktValueParameterSymbol)
+        if (symbolOrigin == Origin.KOTLIN && ktValueParameterSymbol.psi == null) {
+            Origin.SYNTHETIC
+        } else {
+            symbolOrigin
+        }
     }
 
     override val location: Location by lazy {
@@ -78,5 +104,12 @@ class KSValueParameterImpl private constructor(
 
     override fun toString(): String {
         return name?.asString() ?: "_"
+    }
+
+    override fun defer(): Restorable? {
+        val other = (parent as Deferrable).defer() ?: return null
+        return ktValueParameterSymbol.defer inner@{
+            getCached(it, other.restore() ?: return@inner null)
+        }
     }
 }

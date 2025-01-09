@@ -16,6 +16,23 @@ class AsMemberOfProcessor : AbstractTestProcessor() {
     }
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+
+        listOf("main.Test", "lib.Test", "main.TestKt", "lib.TestKt").forEach { clsName ->
+            resolver.getClassDeclarationByName(clsName)!!.let { cls ->
+                val listType = cls.getAllFunctions().single { it.simpleName.asString() == "f" }.returnType!!.resolve()
+                val listDecl = listType.declaration as KSClassDeclaration
+                val iterator = listDecl.getAllFunctions().single { it.simpleName.asString() == "iterator" }
+                results.add("$clsName: ${iterator.asMemberOf(listType).returnType}")
+                val listIterator = resolver.getClassDeclarationByName("kotlin.collections.List")!!
+                    .getDeclaredFunctions().single { it.simpleName.asString() == "iterator" }
+                results.add("$clsName: ${listIterator.asMemberOf(listType).returnType}")
+                val mutableListIterator =
+                    resolver.getClassDeclarationByName("kotlin.collections.MutableCollection")!!
+                        .getDeclaredFunctions().single { it.simpleName.asString() == "iterator" }
+                results.add("$clsName: ${mutableListIterator.asMemberOf(listType).returnType}")
+            }
+        }
+
         val base = resolver.getClassDeclarationByName("Base")!!
         val child1 = resolver.getClassDeclarationByName("Child1")!!
         addToResults(resolver, base, child1.asStarProjectedType())
@@ -95,6 +112,13 @@ class AsMemberOfProcessor : AbstractTestProcessor() {
         results.add(getX.asMemberOf(javaImpl.asStarProjectedType()).toSignature())
         results.add(getY.asMemberOf(javaImpl.asStarProjectedType()).toSignature())
         results.add(setY.asMemberOf(javaImpl.asStarProjectedType()).toSignature())
+
+        resolver.getClassDeclarationByName("Baz")!!.let { cls ->
+            cls.getDeclaredFunctions().single { it.simpleName.asString() == "method1" }.let { f ->
+                val usage = resolver.getClassDeclarationByName("Usage")!!.asType(emptyList())
+                results.add(f.asMemberOf(usage).returnType!!.toSignature())
+            }
+        }
         return emptyList()
     }
 

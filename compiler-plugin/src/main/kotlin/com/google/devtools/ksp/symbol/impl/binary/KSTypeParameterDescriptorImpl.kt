@@ -18,11 +18,11 @@
 package com.google.devtools.ksp.symbol.impl.binary
 
 import com.google.devtools.ksp.ExceptionMessage
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.kotlin.KSExpectActualNoImpl
-import com.google.devtools.ksp.symbol.impl.kotlin.KSNameImpl
-import com.google.devtools.ksp.toKSVariance
+import com.google.devtools.ksp.symbol.impl.toKSVariance
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor

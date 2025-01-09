@@ -18,12 +18,24 @@
 // WITH_RUNTIME
 // TEST PROCESSOR: AsMemberOfProcessor
 // EXPECTED:
+// main.Test: MutableIterator<(String..String?)>
+// main.Test: Iterator<(String..String?)>
+// main.Test: MutableIterator<(String..String?)>
+// lib.Test: MutableIterator<(String..String?)>
+// lib.Test: Iterator<(String..String?)>
+// lib.Test: MutableIterator<(String..String?)>
+// main.TestKt: MutableIterator<String>
+// main.TestKt: Iterator<String>
+// main.TestKt: MutableIterator<String>
+// lib.TestKt: MutableIterator<String>
+// lib.TestKt: Iterator<String>
+// lib.TestKt: MutableIterator<String>
 // Child1!!
 // intType: kotlin.Int!!
 // baseTypeArg1: kotlin.Int!!
 // baseTypeArg2: kotlin.String?
 // typePair: kotlin.Pair!!<kotlin.String?, kotlin.Int!!>
-// errorType: <Error>?
+// errorType: <ERROR TYPE: NonExistType>?
 // extensionProperty: kotlin.String?
 // returnInt: () -> kotlin.Int!!
 // returnArg1: () -> kotlin.Int!!
@@ -40,7 +52,7 @@
 // baseTypeArg1: kotlin.Any?
 // baseTypeArg2: kotlin.Any?
 // typePair: kotlin.Pair!!<kotlin.Any?, kotlin.Any?>
-// errorType: <Error>?
+// errorType: <ERROR TYPE: NonExistType>?
 // extensionProperty: kotlin.Any?
 // returnInt: () -> kotlin.Int!!
 // returnArg1: () -> kotlin.Any?
@@ -57,7 +69,7 @@
 // baseTypeArg1: kotlin.String!!
 // baseTypeArg2: kotlin.String?
 // typePair: kotlin.Pair!!<kotlin.String?, kotlin.String!!>
-// errorType: <Error>?
+// errorType: <ERROR TYPE: NonExistType>?
 // extensionProperty: kotlin.String?
 // returnInt: () -> kotlin.Int!!
 // returnArg1: () -> kotlin.String!!
@@ -96,7 +108,7 @@
 // intType: kotlin.Int!!
 // typeArg1: kotlin.String
 // typeArg2: kotlin.Int
-// errorType: <Error>?
+// errorType: <ERROR TYPE: NonExist>?
 // returnArg1: () -> kotlin.Int
 // receiveArgs: (kotlin.String, kotlin.Int, kotlin.Int!!) -> kotlin.Unit!!
 // methodArgType: <BaseTypeArg1: kotlin.Any>(JavaBase.methodArgType.BaseTypeArg1, kotlin.Int) -> kotlin.Unit!!
@@ -104,13 +116,29 @@
 // fileLevelFunction: java.lang.IllegalArgumentException: Cannot call asMemberOf with a function that is not declared in a class or an interface
 // fileLevelExtensionFunction: java.lang.IllegalArgumentException: Cannot call asMemberOf with a function that is not declared in a class or an interface
 // fileLevelProperty: java.lang.IllegalArgumentException: Cannot call asMemberOf with a property that is not declared in a class or an interface
-// errorType: (<Error>?) -> <Error>?
+// errorType: (<ERROR TYPE: Int>?) -> <ERROR TYPE: E>?
 // expected comparison failures
 // <BaseTypeArg1: kotlin.Any?>(Base.functionArgType.BaseTypeArg1?) -> kotlin.String?
 // () -> kotlin.Int!!
 // () -> kotlin.Int!!
 // (kotlin.Int!!) -> kotlin.Unit!!
+// Baz!!<kotlin.Long!!, kotlin.Number!!>
 // END
+// MODULE: lib
+// FILE: Test.java
+package lib;
+import java.util.List;
+class Test {
+    List<String> f() {
+        throw new RuntimeException("stub");
+    }
+}
+// FILE: TestKt.kt
+package lib
+class TestKt {
+    fun f(): MutableList<String> = TODO()
+}
+// MODULE: main(lib)
 // FILE: Input.kt
 open class Base<BaseTypeArg1, BaseTypeArg2> {
     val intType: Int = 0
@@ -156,6 +184,16 @@ interface KotlinInterface {
     var y:Int
 }
 
+interface Usage : Foo<Long, Integer> {
+    fun foo(param: Foo<Double, Integer>): Foo<String, Integer>
+}
+interface Foo<V1, V2: Integer> : Bar<Baz<V1, Number>, V2> {}
+interface Bar<U1, U2: Integer> : Baz<U1, U2> {}
+interface Baz<T1, T2: Number> {
+    fun method1(): T1
+    fun method2(): T2
+}
+
 // FILE: JavaInput.java
 class JavaBase<BaseTypeArg1, BaseTypeArg2> {
     int intType;
@@ -185,4 +223,18 @@ class JavaImpl implements KotlinInterface {
     }
     public void setY(int value) {
     }
+}
+
+// FILE: main/Test.java
+package main;
+import java.util.List;
+class Test {
+    List<String> f() {
+        throw new RuntimeException("stub");
+    }
+}
+// FILE: TestKt.kt
+package main
+class TestKt {
+    fun f(): MutableList<String> = TODO()
 }

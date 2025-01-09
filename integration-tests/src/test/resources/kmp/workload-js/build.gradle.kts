@@ -6,12 +6,12 @@ plugins {
 version = "1.0-SNAPSHOT"
 
 kotlin {
-    js(BOTH) {
+    js(IR) {
         browser()
         nodejs()
     }
     sourceSets {
-        val commonMain by getting {
+        val jsMain by getting {
             dependencies {
                 implementation(project(":annotations"))
             }
@@ -23,8 +23,4 @@ dependencies {
     add("kspCommonMainMetadata", project(":test-processor"))
     add("kspJs", project(":test-processor"))
     add("kspJsTest", project(":test-processor"))
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions.freeCompilerArgs += "-Xuse-deprecated-legacy-compiler"
 }

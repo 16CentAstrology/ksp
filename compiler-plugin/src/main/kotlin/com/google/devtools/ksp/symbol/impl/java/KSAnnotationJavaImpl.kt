@@ -17,14 +17,13 @@
 
 package com.google.devtools.ksp.symbol.impl.java
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.binary.getAbsentDefaultArguments
 import com.google.devtools.ksp.symbol.impl.binary.getDefaultConstructorArguments
-import com.google.devtools.ksp.symbol.impl.kotlin.KSErrorType
-import com.google.devtools.ksp.symbol.impl.kotlin.KSNameImpl
 import com.google.devtools.ksp.symbol.impl.kotlin.KSTypeImpl
 import com.google.devtools.ksp.symbol.impl.toLocation
 import com.intellij.lang.jvm.JvmClassKind
@@ -55,7 +54,7 @@ class KSAnnotationJavaImpl private constructor(val psi: PsiAnnotation) : KSAnnot
             is PsiJavaFile -> KSFileJavaImpl.getCached(parentPsi)
             is PsiClass -> KSClassDeclarationJavaImpl.getCached(parentPsi)
             is PsiMethod -> KSFunctionDeclarationJavaImpl.getCached(parentPsi)
-            is PsiParameter -> KSValueParameterJavaImpl.getCached(parentPsi)
+            is PsiParameter -> KSValueParameterJavaImpl.getCached(parentPsi, this)
             is PsiTypeParameter -> KSTypeParameterJavaImpl.getCached(parentPsi)
             is PsiType ->
                 if (parentPsi.parent is PsiClassType) KSTypeArgumentJavaImpl.getCached(parentPsi, this)
@@ -103,37 +102,6 @@ class KSAnnotationJavaImpl private constructor(val psi: PsiAnnotation) : KSAnnot
         kotlinType?.getDefaultConstructorArguments(emptyList(), this) ?: emptyList()
     }
 
-    /*
-     * Don't map Java types in annotation parameters
-     *
-     * Users may specify Java types explicitly by instances of `Class<T>`.
-     * The situation is similar to `getClassDeclarationByName` where we have
-     * decided to keep those Java types not mapped.
-     *
-     * It would be troublesome if users try to use reflection on types that
-     * were mapped to Kotlin builtins, becuase some of those builtins don't
-     * even exist in classpath.
-     *
-     * Therefore, ResolverImpl.resolveJavaType cannot be used.
-     */
-    private fun resolveJavaTypeSimple(psiType: PsiType): KSType {
-        return when (psiType) {
-            is PsiPrimitiveType -> {
-                ResolverImpl.instance!!.getClassDeclarationByName(psiType.boxedTypeName!!)!!.asStarProjectedType()
-            }
-            is PsiArrayType -> {
-                val componentType = resolveJavaTypeSimple(psiType.componentType)
-                val componentTypeRef = ResolverImpl.instance!!.createKSTypeReferenceFromKSType(componentType)
-                val typeArgs = listOf(ResolverImpl.instance!!.getTypeArgument(componentTypeRef, Variance.INVARIANT))
-                ResolverImpl.instance!!.builtIns.arrayType.replace(typeArgs)
-            }
-            else -> {
-                ResolverImpl.instance!!.getClassDeclarationByName(psiType.canonicalText)?.asStarProjectedType()
-                    ?: KSErrorType
-            }
-        }
-    }
-
     private fun calcValue(value: PsiAnnotationMemberValue?): Any? {
         if (value is PsiAnnotation) {
             return getCached(value)
@@ -149,7 +117,7 @@ class KSAnnotationJavaImpl private constructor(val psi: PsiAnnotation) : KSAnnot
         }
         return when (result) {
             is PsiType -> {
-                resolveJavaTypeSimple(result)
+                ResolverImpl.instance!!.resolveJavaTypeInAnnotations(result)
             }
             is PsiLiteralValue -> {
                 result.value

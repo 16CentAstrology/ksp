@@ -19,12 +19,15 @@
 // TEST PROCESSOR: AnnotationArgumentProcessor
 // EXPECTED:
 // defaultInNested
+// SomeClass$WithDollarSign
 // Str
 // 42
 // Foo
 // File
 // Local
 // Array
+// <ERROR TYPE: Missing>
+// [<ERROR TYPE: Missing>, Foo]
 // @Foo
 // @Suppress
 // G
@@ -32,6 +35,21 @@
 // 31
 // Throws
 // END
+// MODULE: module1
+// FILE: placeholder.kt
+// FILE: OtherAnnotation.java
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+@Retention(RetentionPolicy.RUNTIME)
+public @interface OtherAnnotation {
+    String value();
+}
+// FILE: JavaAnnotationWithDefaults.java
+public @interface JavaAnnotationWithDefaults {
+    OtherAnnotation otherAnnotationVal() default @OtherAnnotation("def");
+}
+
+// MODULE: main(module1)
 // FILE: a.kt
 
 enum class RGB {
@@ -47,6 +65,10 @@ class ThrowsClass {
 annotation class Foo(val s: Int) {
     annotation class Nested(val nestedDefault:String = "defaultInNested")
 }
+class `SomeClass$WithDollarSign`
+
+annotation class MyAnnotation(val clazz: KClass<*>)
+
 
 annotation class Bar(
     val argStr: String,
@@ -55,6 +77,8 @@ annotation class Bar(
     val argClsLib: kotlin.reflect.KClass<*>,
     val argClsLocal: kotlin.reflect.KClass<*>,
     val argClsArray: kotlin.reflect.KClass<*>,
+    val argClsMissing: kotlin.reflect.KClass<*>,
+    val argClsMissingInArray: Array<kotlin.reflect.KClass<*>>,
     val argAnnoUser: Foo,
     val argAnnoLib: Suppress,
     val argEnum: RGB,
@@ -64,7 +88,21 @@ annotation class Bar(
 
 fun Fun() {
     @Foo.Nested
-    @Bar("Str", 40 + 2, Foo::class, java.io.File::class, Local::class, Array<String>::class, Foo(17), Suppress("name1", "name2"), RGB.G, JavaEnum.ONE)
+    @MyAnnotation(`SomeClass$WithDollarSign`::class)
+    @Bar(
+        "Str",
+        40 + 2,
+        Foo::class,
+        java.io.File::class,
+        Local::class,
+        Array<String>::class,
+        Missing::class,
+        [Missing::class, Foo::class],
+        Foo(17),
+        Suppress("name1", "name2"),
+        RGB.G,
+        JavaEnum.ONE
+    )
     class Local
 }
 

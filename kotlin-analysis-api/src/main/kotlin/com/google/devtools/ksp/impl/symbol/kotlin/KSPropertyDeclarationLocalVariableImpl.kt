@@ -1,6 +1,7 @@
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
 import com.google.devtools.ksp.symbol.KSExpectActual
 import com.google.devtools.ksp.symbol.KSName
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
@@ -9,15 +10,16 @@ import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.google.devtools.ksp.symbol.KSVisitor
-import org.jetbrains.kotlin.analysis.api.symbols.KtLocalVariableSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaLocalVariableSymbol
+import org.jetbrains.kotlin.psi.KtProperty
 
 class KSPropertyDeclarationLocalVariableImpl private constructor(
-    private val ktLocalVariableSymbol: KtLocalVariableSymbol
+    private val ktLocalVariableSymbol: KaLocalVariableSymbol
 ) : KSPropertyDeclaration,
     AbstractKSDeclarationImpl(ktLocalVariableSymbol),
     KSExpectActual by KSExpectActualImpl(ktLocalVariableSymbol) {
-    companion object : KSObjectCache<KtLocalVariableSymbol, KSPropertyDeclarationLocalVariableImpl>() {
-        fun getCached(ktLocalVariableSymbol: KtLocalVariableSymbol) =
+    companion object : KSObjectCache<KaLocalVariableSymbol, KSPropertyDeclarationLocalVariableImpl>() {
+        fun getCached(ktLocalVariableSymbol: KaLocalVariableSymbol) =
             cache.getOrPut(ktLocalVariableSymbol) { KSPropertyDeclarationLocalVariableImpl(ktLocalVariableSymbol) }
     }
 
@@ -28,7 +30,9 @@ class KSPropertyDeclarationLocalVariableImpl private constructor(
     override val extensionReceiver: KSTypeReference? = null
 
     override val type: KSTypeReference by lazy {
-        KSTypeReferenceImpl.getCached(ktLocalVariableSymbol.returnType)
+        (ktLocalVariableSymbol.psiIfSource() as? KtProperty)?.typeReference
+            ?.let { KSTypeReferenceImpl.getCached(it, this) }
+            ?: KSTypeReferenceResolvedImpl.getCached(ktLocalVariableSymbol.returnType, this)
     }
 
     override val isMutable: Boolean = !ktLocalVariableSymbol.isVal
@@ -43,11 +47,13 @@ class KSPropertyDeclarationLocalVariableImpl private constructor(
         TODO("Not yet implemented")
     }
 
-    override val qualifiedName: KSName? by lazy {
-        KSNameImpl.getCached("${parentDeclaration?.qualifiedName?.asString()}.${this.simpleName.asString()}")
-    }
+    override val qualifiedName: KSName? = null
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitPropertyDeclaration(this, data)
+    }
+
+    override fun defer(): Restorable? {
+        return ktLocalVariableSymbol.defer(::getCached)
     }
 }

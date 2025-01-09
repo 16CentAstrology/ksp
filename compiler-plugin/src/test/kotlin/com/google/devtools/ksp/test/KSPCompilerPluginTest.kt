@@ -74,6 +74,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
         runTest("../test-utils/testData/api/annotationOnConstructorParameter.kt")
     }
 
+    @TestMetadata("annotationsRepeatable.kt")
+    @Test
+    fun testAnnotationsRepeatable() {
+        runTest("../test-utils/testData/api/annotationsRepeatable.kt")
+    }
+
     @TestMetadata("annotationWithArbitraryClassValue.kt")
     @Test
     fun testAnnotationWithArbitraryClassValue() {
@@ -84,6 +90,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
     @Test
     fun testAnnotationValue_java() {
         runTest("../test-utils/testData/api/annotationValue_java.kt")
+    }
+
+    @TestMetadata("annotationValue_java2.kt")
+    @Test
+    fun testAnnotationValue_java2() {
+        runTest("../test-utils/testData/api/annotationValue_java2.kt")
     }
 
     @TestMetadata("annotationValue_kt.kt")
@@ -180,6 +192,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
     @Test
     fun testDeclarationPackageName() {
         runTest("../test-utils/testData/api/declarationPackageName.kt")
+    }
+
+    @TestMetadata("declarationsInAccessor.kt")
+    @Test
+    fun testDeclarationsInAccessor() {
+        runTest("../test-utils/testData/api/declarationsInAccessor.kt")
     }
 
     @TestMetadata("declarationOrder.kt")
@@ -339,6 +357,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
         runTest("../test-utils/testData/api/javaWildcards2.kt")
     }
 
+    @TestMetadata("jvmName.kt")
+    @Test
+    fun testJvmName() {
+        runTest("../test-utils/testData/api/jvmName.kt")
+    }
+
     @TestMetadata("lateinitProperties.kt")
     @Test
     fun testLateinitProperties() {
@@ -349,6 +373,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
     @Test
     fun testLibOrigins() {
         runTest("../test-utils/testData/api/libOrigins.kt")
+    }
+
+    @TestMetadata("locations.kt")
+    @Test
+    fun testLocations() {
+        runTest("../test-utils/testData/api/locations.kt")
     }
 
     @TestMetadata("makeNullable.kt")
@@ -369,6 +399,12 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
         runTest("../test-utils/testData/api/multipleModules.kt")
     }
 
+    @TestMetadata("nestedAnnotations.kt")
+    @Test
+    fun testNestedAnnotations() {
+        runTest("../test-utils/testData/api/nestedAnnotations.kt")
+    }
+
     @TestMetadata("nestedClassType.kt")
     @Test
     fun testNestedClassType() {
@@ -381,10 +417,64 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
         runTest("../test-utils/testData/api/nullableTypes.kt")
     }
 
-    @TestMetadata("overridee.kt")
+    @TestMetadata("conflictingOverride.kt")
     @Test
-    fun testOverridee() {
-        runTest("../test-utils/testData/api/overridee.kt")
+    fun testConflictingOverride() {
+        runTest("../test-utils/testData/api/overridee/conflictingOverride.kt")
+    }
+
+    @TestMetadata("javaAccessor.kt")
+    @Test
+    fun testJavaAccessor() {
+        runTest("../test-utils/testData/api/overridee/javaAccessor.kt")
+    }
+
+    @TestMetadata("javaAnno.kt")
+    @Test
+    fun testJavaAnno() {
+        runTest("../test-utils/testData/api/overridee/javaAnno.kt")
+    }
+
+    @TestMetadata("javaOverrideInSource.kt")
+    @Test
+    fun testJavaOverrideInSource() {
+        runTest("../test-utils/testData/api/overridee/javaOverrideInSource.kt")
+    }
+
+    @TestMetadata("noOverride.kt")
+    @Test
+    fun testNoOverride() {
+        runTest("../test-utils/testData/api/overridee/noOverride.kt")
+    }
+
+    @TestMetadata("overrideInLib.kt")
+    @Test
+    fun testOverrideInLib() {
+        runTest("../test-utils/testData/api/overridee/overrideInLib.kt")
+    }
+
+    @TestMetadata("overrideInSource.kt")
+    @Test
+    fun testOverrideInSource() {
+        runTest("../test-utils/testData/api/overridee/overrideInSource.kt")
+    }
+
+    @TestMetadata("overrideOrder.kt")
+    @Test
+    fun testOverrideOrder() {
+        runTest("../test-utils/testData/api/overridee/overrideOrder.kt")
+    }
+
+    @TestMetadata("primaryConstructorOverride.kt")
+    @Test
+    fun testPrimaryConstructorOverride() {
+        runTest("../test-utils/testData/api/overridee/primaryConstructorOverride.kt")
+    }
+
+    @TestMetadata("packageAnnotations.kt")
+    @Test
+    fun testPackageAnnotation() {
+        runTest("../test-utils/testData/api/packageAnnotations.kt")
     }
 
     @TestMetadata("parameterTypes.kt")
@@ -437,6 +527,13 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
     @Test
     fun testRecordJavaOverrides() {
         runTest("../test-utils/testData/api/recordJavaOverrides.kt")
+    }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @TestMetadata("recordJavaResolutions.kt")
+    @Test
+    fun testRecordJavaResolutions() {
+        runTest("../test-utils/testData/api/recordJavaResolutions.kt")
     }
 
     @DisabledOnOs(OS.WINDOWS)
@@ -507,16 +604,46 @@ class KSPCompilerPluginTest : AbstractKSPCompilerPluginTest() {
         runTest("../test-utils/testData/api/typeAliasComparison.kt")
     }
 
+    @TestMetadata("typeAnnotation.kt")
+    @Test
+    fun testTypeAnnotation() {
+        runTest("../test-utils/testData/api/typeAnnotation.kt")
+    }
+
+    @TestMetadata("typeArgumentVariance.kt")
+    @Test
+    fun testTypeArgumentVariance() {
+        runTest("../test-utils/testData/api/typeArgumentVariance.kt")
+    }
+
+    @TestMetadata("typeComparison2.kt")
+    @Test
+    fun testTypeComparison2() {
+        runTest("../test-utils/testData/api/typeComparison2.kt")
+    }
+
     @TestMetadata("typeComposure.kt")
     @Test
     fun testTypeComposure() {
         runTest("../test-utils/testData/api/typeComposure.kt")
     }
 
+    @TestMetadata("typeParameterEquals.kt")
+    @Test
+    fun testTypeParameterEquals() {
+        runTest("../test-utils/testData/api/typeParameterEquals.kt")
+    }
+
     @TestMetadata("typeParameterReference.kt")
     @Test
     fun testTypeParameterReference() {
         runTest("../test-utils/testData/api/typeParameterReference.kt")
+    }
+
+    @TestMetadata("typeParameterVariance.kt")
+    @Test
+    fun testTypeParameterVariance() {
+        runTest("../kotlin-analysis-api/testData/typeParameterVariance.kt")
     }
 
     @TestMetadata("varianceTypeCheck.kt")

@@ -37,7 +37,7 @@ class VisibilityProcessor : AbstractTestProcessor() {
         val symbolA = resolver.getSymbolsWithAnnotation("TestA").single() as KSClassDeclaration
         val symbolB = resolver.getSymbolsWithAnnotation("TestB").single() as KSClassDeclaration
         val symbolD = resolver.getSymbolsWithAnnotation("TestD").single() as KSClassDeclaration
-        val allFunctions = (symbolA.superTypes.single().resolve()!!.declaration as KSClassDeclaration)
+        val allFunctions = (symbolA.superTypes.single().resolve().declaration as KSClassDeclaration)
             .declarations.filterIsInstance<KSFunctionDeclaration>()
         allFunctions.map {
             "${it.simpleName.asString()}: ${it.getVisibility()},visible in A, B, D: " +
@@ -51,6 +51,7 @@ class VisibilityProcessor : AbstractTestProcessor() {
         val javaEnum = resolver.getClassDeclarationByName("Enum")!!
         val kotlinEnum = resolver.getClassDeclarationByName("KtEnum")!!
         val kotlinEnumWithVal = resolver.getClassDeclarationByName("KtEnumWithVal")!!
+        val javaAnnotation = resolver.getClassDeclarationByName("JavaAnnotation")!!
         javaClass.declarations.filterIsInstance<KSPropertyDeclaration>().map {
             "${it.simpleName.asString()}: ${it.getVisibility()},visible in A, B, D: " +
                 "${it.isVisibleFrom(symbolA)}, ${it.isVisibleFrom(symbolB)}, ${it.isVisibleFrom(symbolD)}"
@@ -77,6 +78,9 @@ class VisibilityProcessor : AbstractTestProcessor() {
         }.forEach { results.add(it) }
         kotlinEnumWithVal.declarations.filterIsInstance<KSFunctionDeclaration>().map {
             "${kotlinEnumWithVal.simpleName.asString()}: ${it.simpleName.asString()}: ${it.getVisibility() }"
+        }.forEach { results.add(it) }
+        javaAnnotation.declarations.filterIsInstance<KSPropertyDeclaration>().map {
+            "${javaAnnotation.simpleName.asString()}: ${it.simpleName.asString()}: ${it.getVisibility() }"
         }.forEach { results.add(it) }
         return emptyList()
     }

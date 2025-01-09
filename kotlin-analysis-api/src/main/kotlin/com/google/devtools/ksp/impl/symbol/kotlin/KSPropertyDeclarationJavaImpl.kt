@@ -1,15 +1,20 @@
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.impl.ResolverAAImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
 import com.google.devtools.ksp.symbol.*
-import org.jetbrains.kotlin.analysis.api.symbols.KtJavaFieldSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaJavaFieldSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolModality
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbolVisibility
 
-class KSPropertyDeclarationJavaImpl private constructor(private val ktJavaFieldSymbol: KtJavaFieldSymbol) :
+class KSPropertyDeclarationJavaImpl private constructor(val ktJavaFieldSymbol: KaJavaFieldSymbol) :
     KSPropertyDeclaration,
     AbstractKSDeclarationImpl(ktJavaFieldSymbol),
     KSExpectActual by KSExpectActualImpl(ktJavaFieldSymbol) {
-    companion object : KSObjectCache<KtJavaFieldSymbol, KSPropertyDeclaration>() {
-        fun getCached(ktJavaFieldSymbol: KtJavaFieldSymbol): KSPropertyDeclaration =
+    companion object : KSObjectCache<KaJavaFieldSymbol, KSPropertyDeclaration>() {
+        fun getCached(ktJavaFieldSymbol: KaJavaFieldSymbol): KSPropertyDeclaration =
             cache.getOrPut(ktJavaFieldSymbol) { KSPropertyDeclarationJavaImpl(ktJavaFieldSymbol) }
     }
     override val getter: KSPropertyGetter?
@@ -22,7 +27,7 @@ class KSPropertyDeclarationJavaImpl private constructor(private val ktJavaFieldS
         get() = null
 
     override val type: KSTypeReference by lazy {
-        KSTypeReferenceImpl.getCached(ktJavaFieldSymbol.returnType, this@KSPropertyDeclarationJavaImpl)
+        KSTypeReferenceResolvedImpl.getCached(ktJavaFieldSymbol.returnType, this@KSPropertyDeclarationJavaImpl)
     }
 
     override val isMutable: Boolean
@@ -36,11 +41,11 @@ class KSPropertyDeclarationJavaImpl private constructor(private val ktJavaFieldS
     }
 
     override fun findOverridee(): KSPropertyDeclaration? {
-        TODO("Not yet implemented")
+        return null
     }
 
     override fun asMemberOf(containing: KSType): KSType {
-        TODO("Not yet implemented")
+        return ResolverAAImpl.instance.computeAsMemberOf(this, containing)
     }
 
     override val typeParameters: List<KSTypeParameter>
@@ -51,12 +56,32 @@ class KSPropertyDeclarationJavaImpl private constructor(private val ktJavaFieldS
     }
 
     override val packageName: KSName
-        get() = KSNameImpl.getCached(ktJavaFieldSymbol.callableIdIfNonLocal?.packageName?.asString() ?: "")
+        get() = KSNameImpl.getCached(ktJavaFieldSymbol.callableId?.packageName?.asString() ?: "")
 
     override val origin: Origin
-        get() = Origin.JAVA
+        get() = mapAAOrigin(ktJavaFieldSymbol)
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitPropertyDeclaration(this, data)
     }
+
+    override fun defer(): Restorable? {
+        return ktJavaFieldSymbol.defer(::getCached)
+    }
+}
+
+internal fun KaJavaFieldSymbol.toModifiers(): Set<Modifier> {
+    val result = mutableSetOf<Modifier>()
+    if (visibility != KaSymbolVisibility.PACKAGE_PRIVATE) {
+        result.add(visibility.toModifier())
+    }
+    if (isStatic) {
+        result.add(Modifier.JAVA_STATIC)
+        result.add(Modifier.FINAL)
+    }
+    // Analysis API returns open for static members which should be ignored.
+    if (!isStatic || modality != KaSymbolModality.OPEN) {
+        result.add(modality.toModifier())
+    }
+    return result
 }

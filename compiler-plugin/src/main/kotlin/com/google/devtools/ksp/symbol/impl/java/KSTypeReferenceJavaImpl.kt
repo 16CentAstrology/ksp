@@ -18,8 +18,8 @@
 package com.google.devtools.ksp.symbol.impl.java
 
 import com.google.devtools.ksp.ExceptionMessage
-import com.google.devtools.ksp.KSObjectCache
-import com.google.devtools.ksp.memoized
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
@@ -98,7 +98,7 @@ class KSTypeReferenceJavaImpl private constructor(val psi: PsiType, override val
                 val componentType = ResolverImpl.instance!!.resolveJavaType(type.componentType, this)
                 if (type.componentType !is PsiPrimitiveType) {
                     KSClassifierReferenceDescriptorImpl.getCached(
-                        ResolverImpl.instance!!.module.builtIns.getArrayType(Variance.INVARIANT, componentType),
+                        ResolverImpl.instance!!.module.builtIns.getArrayType(Variance.OUT_VARIANCE, componentType),
                         origin,
                         this
                     )
@@ -124,11 +124,13 @@ class KSTypeReferenceJavaImpl private constructor(val psi: PsiType, override val
             .mapNotNull {
                 (it.annotationType.resolve() as? KSTypeImpl)?.kotlinType?.constructor?.declarationDescriptor?.fqNameSafe
             }
-        val resolved = if ((resolvedType.declaration as? KSClassDeclarationDescriptorImpl)
-            ?.descriptor is NotFoundClasses.MockClassDescriptor
-        ) {
-            KSErrorType
-        } else resolvedType
+        val resolved = when (val declaration = resolvedType.declaration) {
+            is KSClassDeclarationDescriptorImpl -> when (val descriptor = declaration.descriptor) {
+                is NotFoundClasses.MockClassDescriptor -> KSErrorType(descriptor.name.asString())
+                else -> resolvedType
+            }
+            else -> resolvedType
+        }
         val hasNotNull = relatedAnnotations.any { it in NOT_NULL_ANNOTATIONS }
         val hasNullable = relatedAnnotations.any { it in NULLABLE_ANNOTATIONS }
         return if (hasNullable && !hasNotNull) {

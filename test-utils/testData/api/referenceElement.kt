@@ -20,12 +20,15 @@
 // EXPECTED:
 // KSClassifierReferenceImpl: Qualifier of B is A
 // KSClassifierReferenceImpl: Qualifier of C is A
+// KSClassifierReferenceImpl: Qualifier of ExampleAnnotation is null
+// KSClassifierReferenceImpl: Qualifier of ExampleParameter is null
 // KSClassifierReferenceImpl: Qualifier of Int is null
 // KSClassifierReferenceImpl: Qualifier of String is null
 // KSClassifierReferenceDescriptorImpl: Qualifier of Int is null
 // KSClassifierReferenceDescriptorImpl: Qualifier of String is null
 // KSClassifierReferenceDescriptorImpl: Qualifier of Y is X
 // KSClassifierReferenceDescriptorImpl: Qualifier of Z<Int> is X<String>
+// KSDefNonNullReferenceImpl: Enclosed type of T
 // KSClassifierReferenceJavaImpl: Qualifier of H is J<String>
 // KSClassifierReferenceJavaImpl: Qualifier of I is J
 // KSClassifierReferenceJavaImpl: Qualifier of Object is null
@@ -41,15 +44,23 @@ class X<T1> {
     class Y
     inner class Z<T2>
 }
+annotation class ExampleAnnotation<T>
+
+interface ExampleParameter
 
 val z: X.Y = X.Y()
 val w: X<String>.Z<Int> = X<String>().Z<Int>()
 
 // MODULE: main(lib)
 // FILE: reference.kt
+@ExampleAnnotation<ExampleParameter>
 class A<T1> {
     class B
     inner class C<T2>
+}
+
+class DefNonNull<T> {
+    val u: T & Any
 }
 
 val x: A.B = A.B()

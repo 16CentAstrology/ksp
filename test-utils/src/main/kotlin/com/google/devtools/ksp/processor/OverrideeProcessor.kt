@@ -42,12 +42,13 @@ class OverrideeProcessor : AbstractTestProcessor() {
         logSubject(resolver, "JavaAccessorImpl")
         logSubject(resolver, "JavaAnno")
         logSubject(resolver, "JavaAnnos")
+        logSubject(resolver, "PrimaryConstructorOverride")
         return emptyList()
     }
 
     private fun logSubject(resolver: Resolver, qName: String) {
+        val subject = resolver.getClassDeclarationByName(qName) ?: return
         results.add("$qName:")
-        val subject = resolver.getClassDeclarationByName(qName)!!
         subject.declarations.filterIsInstance<KSClassDeclaration>().forEach {
             logClass(it)
         }
@@ -55,11 +56,11 @@ class OverrideeProcessor : AbstractTestProcessor() {
     }
 
     private fun logClass(subject: KSClassDeclaration) {
-        subject.declarations.filterIsInstance<KSPropertyDeclaration>()
+        subject.declarations.filterIsInstance<KSPropertyDeclaration>().sortedBy { it.simpleName.asString() }
             .forEach {
                 checkOverridee(it)
             }
-        subject.declarations.filterIsInstance<KSFunctionDeclaration>()
+        subject.declarations.filterIsInstance<KSFunctionDeclaration>().sortedBy { it.simpleName.asString() }
             .filterNot { it.simpleName.asString() in IGNORED_METHOD_NAMES }
             .forEach {
                 checkOverridee(it)

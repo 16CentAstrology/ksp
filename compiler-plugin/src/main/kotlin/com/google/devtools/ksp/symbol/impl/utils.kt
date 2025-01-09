@@ -16,11 +16,11 @@
  */
 package com.google.devtools.ksp.symbol.impl
 
-import com.google.devtools.ksp.BinaryClassInfoCache
 import com.google.devtools.ksp.ExceptionMessage
 import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.common.errorTypeOnInconsistentArguments
+import com.google.devtools.ksp.common.impl.KSNameImpl
 import com.google.devtools.ksp.processing.impl.ResolverImpl
-import com.google.devtools.ksp.processing.impl.workaroundForNested
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.Variance
 import com.google.devtools.ksp.symbol.impl.binary.KSClassDeclarationDescriptorImpl
@@ -49,6 +49,7 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaMethod
 import org.jetbrains.kotlin.load.kotlin.KotlinJvmBinaryClass
 import org.jetbrains.kotlin.load.kotlin.KotlinJvmBinarySourceElement
 import org.jetbrains.kotlin.load.kotlin.getContainingKotlinJvmBinaryClass
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
@@ -65,11 +66,12 @@ fun PsiElement.findParentAnnotated(): KSAnnotated? {
     var parent = when (this) {
         // Unfortunately, LightMethod doesn't implement parent.
         is LightMethod -> this.containingClass
+        is PsiMethod -> this.containingClass
         else -> this.parent
     }
 
     while (parent != null && parent !is KtDeclaration && parent !is KtFile && parent !is PsiClass &&
-        parent !is PsiMethod && parent !is PsiJavaFile && parent !is KtTypeAlias
+        parent !is PsiMethod && parent !is PsiJavaFile
     ) {
         parent = parent.parent
     }
@@ -135,10 +137,18 @@ fun org.jetbrains.kotlin.types.Variance.toKSVariance(): Variance {
 
 private fun KSTypeReference.toKotlinType() = (resolve() as? KSTypeImpl)?.kotlinType
 
-// returns null if error
-internal fun KotlinType.replaceTypeArguments(newArguments: List<KSTypeArgument>): KotlinType? {
-    if (newArguments.isNotEmpty() && this.arguments.size != newArguments.size)
-        return null
+// returns KSErrorType if error
+internal fun KotlinType.replaceTypeArguments(
+    newArguments: List<KSTypeArgument>,
+    annotations: Sequence<KSAnnotation> = emptySequence(),
+): KSType {
+    errorTypeOnInconsistentArguments(
+        arguments = newArguments,
+        placeholdersProvider = { arguments.map { KSTypeArgumentDescriptorImpl.getCached(it, Origin.SYNTHETIC, null) } },
+        withCorrectedArguments = ::replaceTypeArguments,
+        errorType = ::KSErrorType,
+    )?.let { error -> return error }
+
     return replace(
         newArguments.mapIndexed { index, ksTypeArgument ->
             val variance = when (ksTypeArgument.variance) {
@@ -154,11 +164,11 @@ internal fun KotlinType.replaceTypeArguments(newArguments: List<KSTypeArgument>)
                 else -> throw IllegalStateException(
                     "Unexpected psi for type argument: ${ksTypeArgument.javaClass}, $ExceptionMessage"
                 )
-            }.toKotlinType() ?: return null
+            }.let { it.toKotlinType() ?: return KSErrorType.fromReferenceBestEffort(it) }
 
             TypeProjectionImpl(variance, type)
         }
-    )
+    ).let { KSTypeImpl.getCached(it, newArguments, annotations) }
 }
 
 internal fun FunctionDescriptor.toKSDeclaration(): KSDeclaration {
@@ -230,9 +240,9 @@ internal inline fun <reified T : CallableMemberDescriptor> T.findClosestOverride
 
 internal fun ModuleClassResolver.resolveContainingClass(psiMethod: PsiMethod): ClassDescriptor? {
     return if (psiMethod.isConstructor) {
-        resolveClass(JavaConstructorImpl(psiMethod).containingClass.apply { workaroundForNested() })
+        resolveClass(JavaConstructorImpl(psiMethod).containingClass)
     } else {
-        resolveClass(JavaMethodImpl(psiMethod).containingClass.apply { workaroundForNested() })
+        resolveClass(JavaMethodImpl(psiMethod).containingClass)
     }
 }
 
@@ -261,7 +271,7 @@ internal fun getInstanceForCurrentRound(node: KSNode): KSNode? {
             is KSTypeParameterJavaImpl -> KSTypeParameterJavaImpl.getCached(node.psi)
             is KSTypeReferenceJavaImpl ->
                 KSTypeReferenceJavaImpl.getCached(node.psi, (node.parent as? KSAnnotated)?.getInstanceForCurrentRound())
-            is KSValueParameterJavaImpl -> KSValueParameterJavaImpl.getCached(node.psi)
+            is KSValueParameterJavaImpl -> KSValueParameterJavaImpl.getCached(node.psi, node.parent)
             is KSPropertyGetterSyntheticImpl -> KSPropertyGetterSyntheticImpl.getCached(node.ksPropertyDeclaration)
             is KSPropertySetterSyntheticImpl -> KSPropertySetterSyntheticImpl.getCached(node.ksPropertyDeclaration)
             is KSValueParameterSyntheticImpl ->
@@ -453,6 +463,7 @@ internal class DeclarationOrdering(
  *
  * Note that this is SLOW. AVOID IF POSSIBLE.
  */
+@Suppress("UNCHECKED_CAST")
 @KspExperimental
 internal val KSDeclarationContainer.declarationsInSourceOrder: Sequence<KSDeclaration>
     get() {
@@ -557,3 +568,13 @@ fun DeclarationDescriptor.findPsi(): PsiElement? {
     val leaf = containingFile.findElementAt(psi.textOffset) ?: return null
     return leaf.parentsWithSelf.firstOrNull { psi.manager.areElementsEquivalent(it, psi) }
 }
+
+fun DeclarationDescriptor.correspondsTo(candidate: PsiElement): Boolean {
+    val psi = (this as? DeclarationDescriptorWithSource)?.source?.getPsi() ?: return false
+    return psi.manager.areElementsEquivalent(psi, candidate)
+}
+
+internal fun KSFile.getPackageAnnotations() = (this as? KSFileJavaImpl)?.psi?.packageStatement
+    ?.annotationList?.annotations?.map { KSAnnotationJavaImpl.getCached(it) } ?: emptyList<KSAnnotation>()
+
+fun ClassId.toKSName() = KSNameImpl.getCached(asSingleFqName().toString())

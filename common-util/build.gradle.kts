@@ -4,27 +4,22 @@ evaluationDependsOn(":api")
 
 description = "Kotlin Symbol Processing Util"
 
+val junitVersion: String by project
 val kotlinBaseVersion: String by project
-val intellijVersion: String by project
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.freeCompilerArgs += "-Xjvm-default=compatibility"
+    compilerOptions.freeCompilerArgs.add("-Xjvm-default=all-compatibility")
 }
 
 plugins {
     kotlin("jvm")
-    id("org.jetbrains.intellij") version "0.6.4"
-    id("org.jetbrains.dokka") version ("1.7.20")
-}
-
-intellij {
-    version = intellijVersion
+    id("org.jetbrains.dokka")
 }
 
 dependencies {
-    implementation(kotlin("stdlib", kotlinBaseVersion))
-    implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlinBaseVersion")
     implementation(project(":api"))
+    implementation(kotlin("stdlib", kotlinBaseVersion))
+    testImplementation("junit:junit:$junitVersion")
 }
 
 val dokkaJavadocJar by tasks.register<Jar>("dokkaJavadocJar") {

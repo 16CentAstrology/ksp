@@ -16,21 +16,18 @@
  */
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
-import com.google.devtools.ksp.symbol.KSExpectActual
-import com.google.devtools.ksp.symbol.KSName
-import com.google.devtools.ksp.symbol.KSTypeAlias
-import com.google.devtools.ksp.symbol.KSTypeReference
-import com.google.devtools.ksp.symbol.KSVisitor
-import org.jetbrains.kotlin.analysis.api.symbols.KtTypeAliasSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.nameOrAnonymous
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
+import com.google.devtools.ksp.symbol.*
+import org.jetbrains.kotlin.analysis.api.symbols.*
 
-class KSTypeAliasImpl private constructor(private val ktTypeAliasSymbol: KtTypeAliasSymbol) :
+class KSTypeAliasImpl private constructor(private val ktTypeAliasSymbol: KaTypeAliasSymbol) :
     KSTypeAlias,
     AbstractKSDeclarationImpl(ktTypeAliasSymbol),
     KSExpectActual by KSExpectActualImpl(ktTypeAliasSymbol) {
-    companion object : KSObjectCache<KtTypeAliasSymbol, KSTypeAliasImpl>() {
-        fun getCached(ktTypeAliasSymbol: KtTypeAliasSymbol) =
+    companion object : KSObjectCache<KaTypeAliasSymbol, KSTypeAliasImpl>() {
+        fun getCached(ktTypeAliasSymbol: KaTypeAliasSymbol) =
             cache.getOrPut(ktTypeAliasSymbol) { KSTypeAliasImpl(ktTypeAliasSymbol) }
     }
 
@@ -39,17 +36,33 @@ class KSTypeAliasImpl private constructor(private val ktTypeAliasSymbol: KtTypeA
     }
 
     override val type: KSTypeReference by lazy {
-        KSTypeReferenceImpl.getCached(ktTypeAliasSymbol.expandedType, this)
+        KSTypeReferenceResolvedImpl.getCached(
+            ktTypeAliasSymbol.expandedType.let { it.abbreviation ?: it },
+            this
+        )
     }
 
     override val simpleName: KSName
         get() = name
 
     override val qualifiedName: KSName? by lazy {
-        ktTypeAliasSymbol.classIdIfNonLocal?.asFqNameString()?.let { KSNameImpl.getCached(it) }
+        ktTypeAliasSymbol.classId?.asFqNameString()?.let { KSNameImpl.getCached(it) }
     }
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitTypeAlias(this, data)
     }
+
+    override fun defer(): Restorable? {
+        return ktTypeAliasSymbol.defer(::getCached)
+    }
+}
+
+internal fun KaTypeAliasSymbol.toModifiers(): Set<Modifier> {
+    val result = mutableSetOf<Modifier>()
+    result.add(modality.toModifier())
+    if (visibility != KaSymbolVisibility.PACKAGE_PRIVATE) {
+        result.add(visibility.toModifier())
+    }
+    return result
 }

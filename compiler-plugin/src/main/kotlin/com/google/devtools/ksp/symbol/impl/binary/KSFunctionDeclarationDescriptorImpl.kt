@@ -18,12 +18,10 @@
 package com.google.devtools.ksp.symbol.impl.binary
 
 import com.google.devtools.ksp.ExceptionMessage
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.*
-import com.google.devtools.ksp.toFunctionKSModifiers
-import com.google.devtools.ksp.toKSModifiers
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.impl.AnonymousFunctionDescriptor
 import org.jetbrains.kotlin.load.java.isFromJava
@@ -40,7 +38,7 @@ class KSFunctionDeclarationDescriptorImpl private constructor(val descriptor: Fu
     }
 
     override fun findOverridee(): KSDeclaration? {
-        return descriptor?.findClosestOverridee()?.toKSDeclaration()
+        return descriptor.findClosestOverridee()?.toKSDeclaration()
     }
 
     override val typeParameters: List<KSTypeParameter> by lazy {

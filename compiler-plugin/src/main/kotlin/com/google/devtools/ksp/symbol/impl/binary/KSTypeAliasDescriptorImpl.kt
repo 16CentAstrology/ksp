@@ -1,9 +1,9 @@
 package com.google.devtools.ksp.symbol.impl.binary
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.symbol.*
-import com.google.devtools.ksp.symbol.impl.kotlin.KSNameImpl
-import com.google.devtools.ksp.toKSModifiers
+import com.google.devtools.ksp.symbol.impl.toKSModifiers
 import org.jetbrains.kotlin.descriptors.TypeAliasDescriptor
 
 class KSTypeAliasDescriptorImpl(descriptor: TypeAliasDescriptor) :

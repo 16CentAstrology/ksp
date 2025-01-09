@@ -18,11 +18,21 @@
 // WITH_RUNTIME
 // TEST PROCESSOR: AnnotationArgumentProcessor
 // EXPECTED:
+// MyClass: MyAnnotation
+// MyClass: MyAnnotation: stringParam = 2
+// MyClass: MyAnnotation: stringParam2 = 1
+// MyClass: MyAnnotation: stringArrayParam = [3, 5, 7]
+// MyClass: Containing.Nested
+// MyClassInLib: MyAnnotation
+// MyClassInLib: MyAnnotation: stringParam = 2
+// MyClassInLib: MyAnnotation: stringParam2 = 1
+// MyClassInLib: MyAnnotation: stringArrayParam = [3, 5, 7]
+// MyClassInLib: Containing.Nested
 // Str
 // 42
 // Foo
 // File
-// Error type synthetic declaration
+// <ERROR TYPE: Local>
 // Array
 // @Foo
 // @Suppress
@@ -30,7 +40,43 @@
 // ONE
 // 31
 // [warning1, warning 2]
+// Sub: [i:42]
+// TestJavaLib: OtherAnnotation
 // END
+// MODULE: module1
+// FILE: placeholder.kt
+// FILE: TestLib.java
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+@Target({ElementType.TYPE, ElementType.TYPE_USE})
+@interface MyAnnotation {
+    String stringParam() default "1";
+    String stringParam2() default "1";
+    String[] stringArrayParam() default {"3", "5", "7"};
+}
+
+@interface Containing {
+    @interface Nested {}
+}
+
+interface MyInterface {}
+@MyAnnotation(stringParam = "2") @Containing.Nested class MyClassInLib implements MyInterface {}
+
+// FILE: OtherAnnotation.java
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+@Retention(RetentionPolicy.RUNTIME)
+public @interface OtherAnnotation {
+    String value();
+}
+// FILE: JavaAnnotationWithDefaults.java
+public @interface JavaAnnotationWithDefaults {
+    OtherAnnotation otherAnnotationVal() default @OtherAnnotation("def");
+}
+
+// MODULE: main(module1)
+// FILE: Test.java
+@MyAnnotation(stringParam = "2") @Containing.Nested class MyClass implements MyInterface {}
 // FILE: a.kt
 
 enum class RGB {
@@ -75,3 +121,21 @@ public class JavaAnnotated {}
 // FILE: JavaEnum.java
 
 enum JavaEnum { ONE, TWO, THREE }
+
+// FILE: Nested.java
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
+@Target({ElementType.TYPE, ElementType.TYPE_USE})
+@interface A {
+    int i();
+}
+@Target({ElementType.TYPE, ElementType.TYPE_USE})
+@interface B {
+    A a();
+}
+interface Parent {}
+class Sub implements @B(a = @A(i = 42)) Parent {}
+
+// FILE: TestJavaLib.java
+@JavaAnnotationWithDefaults
+class TestJavaLib {}

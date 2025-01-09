@@ -17,7 +17,8 @@
 
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
@@ -27,17 +28,16 @@ import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Origin
 import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiJavaFile
-import org.jetbrains.kotlin.analysis.api.symbols.KtFileSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtNamedClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtTypeAliasSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaFileSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedClassSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaNamedFunctionSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaTypeAliasSymbol
 import org.jetbrains.kotlin.psi.KtFile
 
-class KSFileImpl private constructor(private val ktFileSymbol: KtFileSymbol) : KSFile {
-    companion object : KSObjectCache<KtFileSymbol, KSFileImpl>() {
-        fun getCached(ktFileSymbol: KtFileSymbol) = cache.getOrPut(ktFileSymbol) { KSFileImpl(ktFileSymbol) }
+class KSFileImpl private constructor(internal val ktFileSymbol: KaFileSymbol) : KSFile, Deferrable {
+    companion object : KSObjectCache<KaFileSymbol, KSFileImpl>() {
+        fun getCached(ktFileSymbol: KaFileSymbol) = cache.getOrPut(ktFileSymbol) { KSFileImpl(ktFileSymbol) }
     }
 
     private val psi: PsiFile
@@ -46,7 +46,6 @@ class KSFileImpl private constructor(private val ktFileSymbol: KtFileSymbol) : K
     override val packageName: KSName by lazy {
         when (psi) {
             is KtFile -> KSNameImpl.getCached((psi as KtFile).packageFqName.asString())
-            is PsiJavaFile -> KSNameImpl.getCached((psi as PsiJavaFile).packageName)
             else -> throw IllegalStateException("Unhandled psi file type ${psi.javaClass}")
         }
     }
@@ -61,12 +60,12 @@ class KSFileImpl private constructor(private val ktFileSymbol: KtFileSymbol) : K
 
     override val declarations: Sequence<KSDeclaration> by lazy {
         analyze {
-            ktFileSymbol.getFileScope().getAllSymbols().map {
+            ktFileSymbol.fileScope.declarations.map {
                 when (it) {
-                    is KtNamedClassOrObjectSymbol -> KSClassDeclarationImpl.getCached(it)
-                    is KtFunctionSymbol -> KSFunctionDeclarationImpl.getCached(it)
-                    is KtPropertySymbol -> KSPropertyDeclarationImpl.getCached(it)
-                    is KtTypeAliasSymbol -> KSTypeAliasImpl.getCached(it)
+                    is KaNamedClassSymbol -> KSClassDeclarationImpl.getCached(it)
+                    is KaNamedFunctionSymbol -> KSFunctionDeclarationImpl.getCached(it)
+                    is KaPropertySymbol -> KSPropertyDeclarationImpl.getCached(it)
+                    is KaTypeAliasSymbol -> KSTypeAliasImpl.getCached(it)
                     else -> throw IllegalStateException("Unhandled ${it.javaClass}")
                 }
             }
@@ -86,10 +85,17 @@ class KSFileImpl private constructor(private val ktFileSymbol: KtFileSymbol) : K
     }
 
     override val annotations: Sequence<KSAnnotation> by lazy {
-        ktFileSymbol.annotations()
+        (ktFileSymbol.psi as? KtFile)?.annotations(ktFileSymbol) ?: ktFileSymbol.annotations(this)
     }
 
     override fun toString(): String {
         return "File: ${this.fileName}"
+    }
+
+    override fun defer(): Restorable {
+        val ptr = analyze { ktFileSymbol.createPointer() }
+        return Restorable {
+            analyze { getCached(ptr.restoreSymbol() as KaFileSymbol) }
+        }
     }
 }

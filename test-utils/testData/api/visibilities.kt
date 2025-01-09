@@ -21,7 +21,7 @@
 // packageFun: JAVA_PACKAGE,visible in A, B, D: true, false, true
 // privateFun: PRIVATE,visible in A, B, D: false, false, false
 // protectedFun: PROTECTED,visible in A, B, D: true, false, true
-// <init>: PUBLIC,visible in A, B, D: true, true, true
+// <init>: JAVA_PACKAGE,visible in A, B, D: true, false, true
 // javaPackageField: JAVA_PACKAGE,visible in A, B, D: true, false, true
 // x: INTERNAL,visible in A, B, D: false, false, false
 // y: PROTECTED,visible in A, B, D: true, false, true
@@ -108,6 +108,11 @@ class C {
     }
 }
 
+
+// FILE: JavaAnnotation.java
+public @interface JavaAnnotation {
+    String value();
+}
 // FILE: Enum.java
 public enum Enum {
     Y,U,V;

@@ -31,11 +31,14 @@
 // noBackingVarB:Ljava/lang/String;
 // noBackingVarA:Ljava/lang/String;
 // noBackingVarC:Ljava/lang/String;
+// privateFun:()V
+// protectedFun:()V
+// internalFun:()V
+// publicFun:()V
 // overloaded:(Ljava/lang/String;)Ljava/lang/String;
 // overloaded:(I)Ljava/lang/String;
 // overloaded:()Ljava/lang/String;
 // overloaded:(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-// <init>:()V
 // lib.JavaClass
 // b:Ljava/lang/String;
 // a:Ljava/lang/String;
@@ -44,7 +47,6 @@
 // overloaded:(I)V
 // overloaded:()V
 // overloaded:(Ljava/lang/String;Ljava/lang/String;)V
-// <init>:()V
 // KotlinClass
 // b:Ljava/lang/String;
 // a:Ljava/lang/String;
@@ -58,11 +60,14 @@
 // noBackingVarB:Ljava/lang/String;
 // noBackingVarA:Ljava/lang/String;
 // noBackingVarC:Ljava/lang/String;
+// privateFun:()V
+// protectedFun:()V
+// internalFun:()V
+// publicFun:()V
 // overloaded:(Ljava/lang/String;)Ljava/lang/String;
 // overloaded:(I)Ljava/lang/String;
 // overloaded:()Ljava/lang/String;
 // overloaded:(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-// <init>:()V
 // JavaClass
 // b:Ljava/lang/String;
 // a:Ljava/lang/String;
@@ -71,6 +76,25 @@
 // overloaded:(I)V
 // overloaded:()V
 // overloaded:(Ljava/lang/String;Ljava/lang/String;)V
+// KotlinCompanion.Companion
+// companionObjectProperty:Ljava/lang/String;
+// companionObjectPropertyJvmStatic:Ljava/lang/String;
+// companionObjectPropertyJvmField:Ljava/lang/String;
+// companionObjectPropertyLateinit:Ljava/lang/String;
+// companionObjectPropertyConst:Ljava/lang/String;
+// companionObjectFunction:(Ljava/lang/String;)V
+// companionObjectFunctionJvmStatic:(Ljava/lang/String;)V
+// lib.KotlinCompanion.Companion
+// companionObjectProperty:Ljava/lang/String;
+// companionObjectPropertyJvmStatic:Ljava/lang/String;
+// companionObjectPropertyLateinit:Ljava/lang/String;
+// companionObjectPropertyConst:Ljava/lang/String;
+// companionObjectPropertyJvmField:Ljava/lang/String;
+// companionObjectFunction:(Ljava/lang/String;)V
+// companionObjectFunctionJvmStatic:(Ljava/lang/String;)V
+// equals:(Ljava/lang/Object;)Z
+// hashCode:()I
+// toString:()Ljava/lang/String;
 // <init>:()V
 // END
 // MODULE: module1
@@ -98,6 +122,10 @@ class KotlinClass {
     var noBackingVarC: String
         get() = ""
         set(value) {}
+    private fun privateFun(): Unit = TODO()
+    protected fun protectedFun(): Unit = TODO()
+    internal fun internalFun(): Unit = TODO()
+    fun publicFun(): Unit = TODO()
     fun overloaded(x:String): String = TODO()
     fun overloaded(x:Int): String = TODO()
     fun overloaded(): String = TODO()
@@ -115,6 +143,23 @@ public class JavaClass {
     void overloaded() {}
     void overloaded(String x, String y) {}
 }
+
+// FILE: lib/KotlinCompanion.kt
+package lib
+class KotlinCompanion {
+    companion object {
+        val companionObjectProperty: String = "hello"
+        @JvmStatic
+        val companionObjectPropertyJvmStatic: String = "hello"
+        @JvmField val companionObjectPropertyJvmField: String = "hello"
+        lateinit var companionObjectPropertyLateinit: String
+        const val companionObjectPropertyConst: String = "hello"
+        fun companionObjectFunction(companionFunctionParam: String) {}
+        @JvmStatic
+        fun companionObjectFunctionJvmStatic(companionFunctionParam: String) {}
+    }
+}
+
 // MODULE: main(module1)
 // FILE: main.kt
 class KotlinClass {
@@ -139,6 +184,10 @@ class KotlinClass {
     var noBackingVarC: String
         get() = ""
         set(value) {}
+    private fun privateFun(): Unit = TODO()
+    protected fun protectedFun(): Unit = TODO()
+    internal fun internalFun(): Unit = TODO()
+    fun publicFun(): Unit = TODO()
     fun overloaded(x:String): String = TODO()
     fun overloaded(x:Int): String = TODO()
     fun overloaded(): String = TODO()
@@ -153,4 +202,19 @@ public class JavaClass {
     void overloaded(int x) {}
     void overloaded() {}
     void overloaded(String x, String y) {}
+}
+
+// FILE: KotlinCompanion.kt
+class KotlinCompanion {
+    companion object {
+        val companionObjectProperty: String = "hello"
+        @JvmStatic
+        val companionObjectPropertyJvmStatic: String = "hello"
+        @JvmField val companionObjectPropertyJvmField: String = "hello"
+        lateinit var companionObjectPropertyLateinit: String
+        const val companionObjectPropertyConst: String = "hello"
+        fun companionObjectFunction(companionFunctionParam: String) {}
+        @JvmStatic
+        fun companionObjectFunctionJvmStatic(companionFunctionParam: String) {}
+    }
 }

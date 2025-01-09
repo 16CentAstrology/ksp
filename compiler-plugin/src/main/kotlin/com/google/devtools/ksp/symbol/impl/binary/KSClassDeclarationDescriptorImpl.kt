@@ -18,6 +18,8 @@
 package com.google.devtools.ksp.symbol.impl.binary
 
 import com.google.devtools.ksp.*
+import com.google.devtools.ksp.common.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.*
@@ -149,9 +151,7 @@ class KSClassDeclarationDescriptorImpl private constructor(val descriptor: Class
     }
 
     override fun asType(typeArguments: List<KSTypeArgument>): KSType =
-        descriptor.defaultType.replaceTypeArguments(typeArguments)?.let {
-            getKSTypeCached(it, typeArguments)
-        } ?: KSErrorType
+        descriptor.defaultType.replaceTypeArguments(typeArguments)
 
     override fun asStarProjectedType(): KSType {
         return getKSTypeCached(descriptor.defaultType.replaceArgumentsWithStarProjections())

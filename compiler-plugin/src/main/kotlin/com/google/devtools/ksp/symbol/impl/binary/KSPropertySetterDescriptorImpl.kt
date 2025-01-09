@@ -17,7 +17,7 @@
 
 package com.google.devtools.ksp.symbol.impl.binary
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.symbol.*
 import org.jetbrains.kotlin.descriptors.PropertySetterDescriptor
 
@@ -33,6 +33,9 @@ class KSPropertySetterDescriptorImpl private constructor(descriptor: PropertySet
         descriptor.valueParameters.singleOrNull()?.let { KSValueParameterDescriptorImpl.getCached(it, this) }
             ?: throw IllegalStateException("Failed to resolve property type")
     }
+
+    override val declarations: Sequence<KSDeclaration>
+        get() = emptySequence()
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitPropertySetter(this, data)

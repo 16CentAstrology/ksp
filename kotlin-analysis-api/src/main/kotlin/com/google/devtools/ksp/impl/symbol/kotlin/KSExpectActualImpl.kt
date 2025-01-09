@@ -18,20 +18,29 @@ package com.google.devtools.ksp.impl.symbol.kotlin
 
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSExpectActual
-import org.jetbrains.kotlin.analysis.api.symbols.KtDeclarationSymbol
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.symbols.KaDeclarationSymbol
 
-class KSExpectActualImpl(private val declarationSymbol: KtDeclarationSymbol) : KSExpectActual {
+class KSExpectActualImpl(private val declarationSymbol: KaDeclarationSymbol) : KSExpectActual {
     override val isActual: Boolean
-        get() = TODO("Not yet implemented")
+        get() = declarationSymbol.isActual
 
     override val isExpect: Boolean
-        get() = TODO("Not yet implemented")
+        get() = declarationSymbol.isExpect
 
+    // TODO: not possible in new KMP model, returning empty sequence for now.
     override fun findActuals(): Sequence<KSDeclaration> {
-        TODO("Not yet implemented")
+        return emptySequence()
     }
 
+    @OptIn(KaExperimentalApi::class)
     override fun findExpects(): Sequence<KSDeclaration> {
-        TODO("Not yet implemented")
+        return if (!isActual) {
+            emptySequence()
+        } else {
+            analyze {
+                declarationSymbol.getExpectsForActual().mapNotNull { it.toKSDeclaration() }
+            }.asSequence()
+        }
     }
 }

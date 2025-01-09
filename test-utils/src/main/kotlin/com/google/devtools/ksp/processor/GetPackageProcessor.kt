@@ -16,6 +16,10 @@ class GetPackageProcessor : AbstractTestProcessor() {
         addPackage("lib1", resolver)
         addPackage("lib2", resolver)
         addPackage("main.test", resolver)
+        addPackage("non.exist", resolver)
+        addPackage("test", resolver)
+        addPackage("testlib", resolver)
+        addPackage("main.nested", resolver)
         return emptyList()
     }
 

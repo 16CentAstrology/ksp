@@ -29,8 +29,20 @@
 // myList_B : List<Number>
 // myList_String : MyList_String = MyList<String> = List<T>
 // myList_b_String : MyList_B_String = MyList_B<String> = MyList<R> = List<T>
+// myListOfAlias : MyListOfAlias = List<A>
+// myListOfAliasInLib : MyListOfAliasInLib = List<@JvmSuppressWildcards AInLib>
+// viewBinderProviders : Map<Class<BaseViewHolder>, @JvmSuppressWildcards Provider<BaseEmbedViewBinder>>
+// nested1 : MyList<ListOfInt> = List<T>
+// nested2 : List<ListOfInt>
 // END
 
+// MODULE: module1
+// FILE: KotlinLib.kt
+typealias AInLib = String
+typealias MyListOfAliasInLib = List<@JvmSuppressWildcards AInLib>
+
+// MODULE: main(module1)
+// FILE: KotlinSrc.kt
 typealias A = String
 typealias B = String
 typealias CC = A
@@ -41,6 +53,7 @@ typealias MyList<T> = List<T>
 typealias MyList_B<R> = MyList<R>
 typealias MyList_String = MyList<String>
 typealias MyList_B_String = MyList_B<String>
+typealias MyListOfAlias = List<@JvmSuppressWildcards A>
 
 val a: A = ""
 val b: B = ""
@@ -53,3 +66,16 @@ val myList: MyList<Long> = TODO()
 val myList_B: List<Number> = TODO()
 val myList_String: MyList_String = TODO()
 val myList_b_String: MyList_B_String = TODO()
+// FIXME: type annotation is missing
+val myListOfAlias: MyListOfAlias = TODO()
+val myListOfAliasInLib: MyListOfAliasInLib = TODO()
+
+interface BaseViewHolder
+interface SpaceshipEmbedModel
+interface Provider<T>
+interface ViewBinder<T1, T2>
+typealias BaseEmbedViewBinder = ViewBinder<out BaseViewHolder, out SpaceshipEmbedModel>
+
+val viewBinderProviders: Map<Class<out BaseViewHolder>, @JvmSuppressWildcards Provider<BaseEmbedViewBinder>> = TODO()
+val nested1: MyList<ListOfInt>
+val nested2: List<ListOfInt>

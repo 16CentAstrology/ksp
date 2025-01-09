@@ -18,7 +18,7 @@
 package com.google.devtools.ksp.symbol.impl.java
 
 import com.google.devtools.ksp.ExceptionMessage
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSNode
@@ -47,13 +47,14 @@ class KSTypeReferenceLiteJavaImpl private constructor(val psiElement: PsiElement
     val type: KSType by lazy {
         when (psiElement) {
             is PsiAnnotation -> {
-                val psiClass = psiElement.nameReferenceElement!!.resolve() as? PsiClass
+                val nameReferenceElement = psiElement.nameReferenceElement!!
+                val psiClass = nameReferenceElement.resolve() as? PsiClass
                 psiClass?.let {
                     (psiElement.containingFile as? PsiJavaFile)?.let {
                         ResolverImpl.instance!!.incrementalContext.recordLookup(it, psiClass.qualifiedName!!)
                     }
                     KSClassDeclarationJavaImpl.getCached(psiClass).asStarProjectedType()
-                } ?: KSErrorType
+                } ?: KSErrorType(nameReferenceElement.text)
             }
             is PsiMethod -> {
                 KSClassDeclarationJavaImpl.getCached(psiElement.containingClass!!).asStarProjectedType()

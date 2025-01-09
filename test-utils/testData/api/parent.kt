@@ -17,11 +17,73 @@
 
 // TEST PROCESSOR: ParentProcessor
 // EXPECTED:
+// parent of File: B.java: null
+// parent of ITF: ITF
+// parent of ITF: B
+// parent of T: B
+// parent of Anno: Anno
+// parent of Anno: @Anno
+// parent of param:: @Anno
+// parent of @Anno: B
+// parent of p: Bnno
+// parent of p.Bnno: Bnno
+// parent of Bnno: @Bnno
+// parent of @Bnno: B
+// parent of B: File: B.java
+// parent of T: T
+// parent of T: t
+// parent of t: B
+// parent of T: T
+// parent of T: t
+// parent of t: foo
+// parent of Int: Int
+// parent of Int: i
+// parent of i: foo
+// parent of Int: Int
+// parent of Int: foo
+// parent of foo: B
+// parent of B<*>: synthetic constructor for B
+// parent of synthetic constructor for B: B
+// parent of RGB: RGB
+// parent of RGB: INVARIANT RGB
+// parent of INVARIANT RGB: Enum<RGB>
+// parent of Enum<RGB>: Enum<RGB>
+// parent of Enum<RGB>: RGB
+// parent of RGB: File: B.java
+// parent of R: RGB
+// parent of G: RGB
+// parent of B: RGB
+// parent of RGB: RGB
+// parent of RGB: COVARIANT RGB
+// parent of COVARIANT RGB: Array<out (RGB..RGB?)>
+// parent of Array<out (RGB..RGB?)>: Array<out (RGB..RGB?)>
+// parent of Array<out (RGB..RGB?)>: values
+// parent of values: RGB
+// parent of String: String
+// parent of String: name
+// parent of name: valueOf
+// parent of RGB: RGB
+// parent of RGB: valueOf
+// parent of valueOf: RGB
+// parent of RGB: synthetic constructor for RGB
+// parent of synthetic constructor for RGB: RGB
+// parent of File: Bnno.kt: null
+// parent of Any: Bnno
+// parent of Bnno: File: Bnno.kt
+// parent of Bnno: synthetic constructor for Bnno
+// parent of synthetic constructor for Bnno: Bnno
 // parent of File: a.kt: null
 // parent of Any: Anno
 // parent of Anno: File: a.kt
-// parent of Anno: synthetic constructor for Anno
-// parent of synthetic constructor for Anno: Anno
+// parent of String: String
+// parent of String: param
+// parent of param: <init>
+// parent of Anno: <init>
+// parent of <init>: Anno
+// parent of String: String
+// parent of String: param.getter()
+// parent of param.getter(): param
+// parent of param: <init>
 // parent of Int: Int
 // parent of Int: INVARIANT Int
 // parent of INVARIANT Int: Map
@@ -30,6 +92,7 @@
 // parent of INVARIANT T: Map
 // parent of Map: Map
 // parent of Map: Alias
+// parent of Any?: T
 // parent of T: Alias
 // parent of Alias: File: a.kt
 // parent of Int: Int
@@ -49,6 +112,7 @@
 // parent of topProp: File: a.kt
 // parent of T: T
 // parent of T: topFun
+// parent of Any?: T
 // parent of T: topFun
 // parent of Anno: Anno
 // parent of Anno: @Anno
@@ -68,6 +132,7 @@
 // parent of Int: memberFun
 // parent of memberFun: topClass
 // parent of Any: InnerClass
+// parent of Any?: P
 // parent of P: InnerClass
 // parent of InnerClass: topClass
 // parent of P: P
@@ -113,62 +178,6 @@
 // parent of synthetic constructor for K: K
 // parent of CMYK: synthetic constructor for CMYK
 // parent of synthetic constructor for CMYK: CMYK
-// parent of File: Bnno.kt: null
-// parent of Any: Bnno
-// parent of Bnno: File: Bnno.kt
-// parent of Bnno: synthetic constructor for Bnno
-// parent of synthetic constructor for Bnno: Bnno
-// parent of File: B.java: null
-// parent of ITF: ITF
-// parent of ITF: B
-// parent of T: B
-// parent of Anno: Anno
-// parent of Anno: @Anno
-// parent of @Anno: B
-// parent of p: Bnno
-// parent of p.Bnno: Bnno
-// parent of Bnno: @Bnno
-// parent of @Bnno: B
-// parent of B: File: B.java
-// parent of T: T
-// parent of T: t
-// parent of t: B
-// parent of T: T
-// parent of T: t
-// parent of t: foo
-// parent of Int: Int
-// parent of Int: i
-// parent of i: foo
-// parent of Int: Int
-// parent of Int: foo
-// parent of foo: B
-// parent of B<*>: synthetic constructor for B
-// parent of synthetic constructor for B: B
-// parent of RGB: RGB
-// parent of RGB: INVARIANT RGB
-// parent of INVARIANT RGB: Enum<RGB>
-// parent of Enum<RGB>: Enum<RGB>
-// parent of Enum<RGB>: RGB
-// parent of RGB: File: B.java
-// parent of R: RGB
-// parent of G: RGB
-// parent of B: RGB
-// parent of RGB: RGB
-// parent of RGB: INVARIANT RGB
-// parent of INVARIANT RGB: Array<(RGB..RGB?)>
-// parent of Array<(RGB..RGB?)>: Array<(RGB..RGB?)>
-// parent of Array<(RGB..RGB?)>: values
-// parent of values: RGB
-// parent of java: String
-// parent of lang: String
-// parent of String: String
-// parent of String: name
-// parent of name: valueOf
-// parent of RGB: RGB
-// parent of RGB: valueOf
-// parent of valueOf: RGB
-// parent of RGB: synthetic constructor for RGB
-// parent of synthetic constructor for RGB: RGB
 // parent of YUV: YUV
 // parent of YUV: INVARIANT YUV
 // parent of INVARIANT YUV: Enum<YUV>
@@ -245,7 +254,7 @@ enum HSV {
 // MODULE: main(lib)
 
 // FILE: a.kt
-annotation class Anno
+annotation class Anno(val param: String = "")
 
 typealias Alias<T> = Map<Int, T>
 

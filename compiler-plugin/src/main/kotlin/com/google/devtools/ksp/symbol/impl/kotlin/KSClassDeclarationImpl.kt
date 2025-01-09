@@ -17,10 +17,10 @@
 
 package com.google.devtools.ksp.symbol.impl.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
-import com.google.devtools.ksp.getClassType
+import com.google.devtools.ksp.common.impl.KSTypeReferenceSyntheticImpl
+import com.google.devtools.ksp.common.memoized
 import com.google.devtools.ksp.isConstructor
-import com.google.devtools.ksp.memoized
+import com.google.devtools.ksp.processing.impl.KSObjectCache
 import com.google.devtools.ksp.processing.impl.ResolverImpl
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.impl.*
@@ -28,7 +28,6 @@ import com.google.devtools.ksp.symbol.impl.binary.getAllFunctions
 import com.google.devtools.ksp.symbol.impl.binary.getAllProperties
 import com.google.devtools.ksp.symbol.impl.binary.sealedSubclassesSequence
 import com.google.devtools.ksp.symbol.impl.synthetic.KSConstructorSyntheticImpl
-import com.google.devtools.ksp.symbol.impl.synthetic.KSTypeReferenceSyntheticImpl
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtObjectDeclaration
@@ -123,9 +122,7 @@ class KSClassDeclarationImpl private constructor(val ktClassOrObject: KtClassOrO
     }
 
     override fun asType(typeArguments: List<KSTypeArgument>): KSType {
-        return descriptor.defaultType.replaceTypeArguments(typeArguments)?.let {
-            getKSTypeCached(it, typeArguments)
-        } ?: KSErrorType
+        return descriptor.defaultType.replaceTypeArguments(typeArguments)
     }
 
     override fun asStarProjectedType(): KSType {

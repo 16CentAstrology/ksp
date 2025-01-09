@@ -23,10 +23,10 @@ class TestProcessor(
         file = codeGenerator.createNewFile(Dependencies(false), "", "TestProcessor", "log")
         emit("TestProcessor: init($options)", "")
 
-        val javaFile = codeGenerator.createNewFile(Dependencies(false), "", "Generated", "java")
+        val javaFile = codeGenerator.createNewFile(Dependencies(true), "", "Generated", "java")
         javaFile.appendText("class Generated {}")
 
-        val fileKt = codeGenerator.createNewFile(Dependencies(false), "", "HELLO", "java")
+        val fileKt = codeGenerator.createNewFile(Dependencies(true), "", "HELLO", "java")
         fileKt.appendText("public class HELLO{\n")
         fileKt.appendText("public int foo() { return 1234; }\n")
         fileKt.appendText("}")
@@ -48,6 +48,10 @@ class TestProcessor(
         }
 
         override fun visitModifierListOwner(modifierListOwner: KSModifierListOwner, data: String) {
+            TODO("Not yet implemented")
+        }
+
+        override fun visitDefNonNullReference(reference: KSDefNonNullReference, data: String) {
             TODO("Not yet implemented")
         }
 
@@ -252,8 +256,8 @@ class TestProcessor(
 
 class TestProcessorProvider : SymbolProcessorProvider {
     override fun create(
-        env: SymbolProcessorEnvironment
+        environment: SymbolProcessorEnvironment
     ): SymbolProcessor {
-        return TestProcessor(env.codeGenerator, env.options)
+        return TestProcessor(environment.codeGenerator, environment.options)
     }
 }

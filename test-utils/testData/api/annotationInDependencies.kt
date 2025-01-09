@@ -45,6 +45,7 @@
 // parameter param1 : annotations.ValueParameterTarget{[value = onParam1]}
 // parameter param2 : annotations.NoTargetAnnotation{[value = onParam2]}
 // parameter param2 : annotations.ValueParameterTarget{[value = onParam2]}
+// parameter propInConstructor : annotations.ValueParameterTarget{[value = propInConstructor]}
 // property prop : annotations.FieldTarget2{[value = field:]}
 // property prop : annotations.FieldTarget{[value = onProp]}
 // property prop : annotations.NoTargetAnnotation{[value = onProp]}
@@ -55,14 +56,13 @@
 // class main.DataClass : annotations.NoTargetAnnotation{[value = onDataClass]}
 // getter of property constructorParam : annotations.PropertyGetterTarget{[value = get:]}
 // parameter <set-?> : annotations.ValueParameterTarget{[value = onConstructorParam]}
-// parameter constructorParam : annotations.FieldTarget2{[value = field:]}
-// parameter constructorParam : annotations.FieldTarget{[value = onConstructorParam]}
 // parameter constructorParam : annotations.NoTargetAnnotation{[value = onConstructorParam]}
-// parameter constructorParam : annotations.PropertyTarget{[value = onConstructorParam]}
+// parameter constructorParam : annotations.ValueParameterTarget{[value = onConstructorParam]}
 // property constructorParam : annotations.FieldTarget2{[value = field:]}
 // property constructorParam : annotations.FieldTarget{[value = onConstructorParam]}
 // property constructorParam : annotations.NoTargetAnnotation{[value = onConstructorParam]}
 // property constructorParam : annotations.PropertyTarget{[value = onConstructorParam]}
+// property constructorParam : annotations.ValueParameterAndFieldTarget{[value = valueParameterAndField]}
 // setter of property constructorParam : annotations.PropertySetterTarget{[value = set:]}
 // lib.DataClass ->
 // class lib.DataClass : annotations.ClassTarget{[value = onDataClass]}
@@ -102,13 +102,17 @@ annotation class FunctionTarget(val value:String)
 
 @Target(AnnotationTarget.VALUE_PARAMETER)
 annotation class ValueParameterTarget(val value:String)
+
+@Target(AnnotationTarget.VALUE_PARAMETER, AnnotationTarget.FIELD)
+annotation class ValueParameterAndFieldTarget(val value: String)
+
 // MODULE: lib(annotations)
 // FILE: ClassInLib.kt
 package lib;
 import annotations.*;
 @NoTargetAnnotation("onClass")
 @ClassTarget("onClass")
-class KotlinClass {
+class KotlinClass(@ValueParameterTarget("propInConstructor") val propInConstructor: String ) {
     @NoTargetAnnotation("onProp")
     @FieldTarget("onProp")
     @PropertyTarget("onProp")
@@ -185,7 +189,9 @@ class DataClass(
     @set:PropertySetterTarget("set:")
     @get:PropertyGetterTarget("get:")
     @field:FieldTarget2("field:")
+    @field:ValueParameterAndFieldTarget("valueParameterAndField")
     @setparam:ValueParameterTarget("onConstructorParam")
+    @ValueParameterTarget("onConstructorParam")
     var constructorParam : String = ""
 )
 // FILE: main/JavaClassInModule2.java

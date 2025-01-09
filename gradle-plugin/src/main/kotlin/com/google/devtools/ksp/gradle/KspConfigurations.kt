@@ -17,25 +17,31 @@ class KspConfigurations(private val project: Project) {
     }
 
     private val allowAllTargetConfiguration =
-        project.findProperty("ksp.allow.all.target.configuration")?.let {
-            it.toString().toBoolean()
-        } ?: true
+        project.providers.gradleProperty("ksp.allow.all.target.configuration")
+            .orNull
+            ?.toBoolean()
+            ?: true
 
-    // The "ksp" configuration, applied to every compilations.
-    private val configurationForAll = project.configurations.create(PREFIX)
+    // The "ksp" configuration, applied to every compilation.
+    private val configurationForAll = project.configurations.create(PREFIX).apply {
+        isCanBeConsumed = false
+        isCanBeResolved = false
+        isVisible = false
+    }
 
     private fun configurationNameOf(vararg parts: String): String {
-        return parts.joinToString("") {
-            it.replaceFirstChar { it.uppercase() }
+        return parts.joinToString("") { part ->
+            part.replaceFirstChar { it.uppercase() }
         }.replaceFirstChar { it.lowercase() }
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
+    /**
+     * Returns a new or existing [Configuration] with the given [name], with applied properties.
+     */
     private fun createConfiguration(
         name: String,
         readableSetName: String,
     ): Configuration {
-        // maybeCreate to be future-proof, but we should never have a duplicate with current logic
         return project.configurations.maybeCreate(name).apply {
             description = "KSP dependencies for the '$readableSetName' source set."
             isCanBeResolved = false // we'll resolve the processor classpath config
@@ -44,25 +50,30 @@ class KspConfigurations(private val project: Project) {
         }
     }
 
-    private fun getAndroidConfigurationName(target: KotlinTarget, sourceSet: String): String {
+    /**
+     * Returns the Android sourceSet-specific KSP configuration name given a [kotlinTarget] and [sourceSet].
+     *
+     * For single-platform, [kotlinTarget] can be null.
+     */
+    private fun getAndroidConfigurationName(kotlinTarget: KotlinTarget?, sourceSet: String): String {
         val isMain = sourceSet.endsWith("main", ignoreCase = true)
         val nameWithoutMain = when {
             isMain -> sourceSet.substring(0, sourceSet.length - 4)
             else -> sourceSet
         }
         // Note: on single-platform, target name is conveniently set to "".
-        return configurationNameOf(PREFIX, target.name, nameWithoutMain)
+        return configurationNameOf(PREFIX, kotlinTarget?.name ?: "", nameWithoutMain)
     }
 
     private fun getKotlinConfigurationName(compilation: KotlinCompilation<*>, sourceSet: KotlinSourceSet): String {
         val isMain = compilation.name == KotlinCompilation.MAIN_COMPILATION_NAME
-        val isDefault = sourceSet.name == compilation.defaultSourceSetName && compilation !is KotlinCommonCompilation
+        val isDefault = sourceSet.name == compilation.defaultSourceSet.name && compilation !is KotlinCommonCompilation
         // Note: on single-platform, target name is conveniently set to "".
         val name = if (isMain && isDefault) {
             // For js(IR), js(LEGACY), the target "js" is created.
             //
             // When js(BOTH) is used, target "jsLegacy" and "jsIr" are created.
-            // Both targets share the same source set. Therefore configurations other than main compilation
+            // Both targets share the same source set. Therefore, configurations other than main compilation
             // are shared. E.g., "kspJsTest".
             // For simplicity and consistency, let's not distinguish them.
             when (val targetName = compilation.target.name) {
@@ -70,7 +81,7 @@ class KspConfigurations(private val project: Project) {
                 else -> targetName
             }
         } else if (compilation is KotlinCommonCompilation) {
-            sourceSet.name + compilation.target.name.capitalize()
+            sourceSet.name + compilation.target.name.replaceFirstChar(Char::uppercaseChar)
         } else {
             sourceSet.name
         }
@@ -81,6 +92,13 @@ class KspConfigurations(private val project: Project) {
         project.plugins.withType(KotlinBasePluginWrapper::class.java).configureEach {
             // 1.6.0: decorateKotlinProject(project.kotlinExtension)?
             decorateKotlinProject(project.extensions.getByName("kotlin") as KotlinProjectExtension, project)
+        }
+        // Create sourceSet-specific KSP configurations for the case when the KotlinBaseApiPlugin is applied instead
+        // of the KotlinBasePluginWrapper (e.g., when AGP's built-in Kotlin support is enabled).
+        project.plugins.withType(KotlinBaseApiPlugin::class.java) {
+            // FIXME: After KT-70897 is fixed and AGP's built-in Kotlin support adds a `kotlin` extension, call
+            //  decorateKotlinProject here instead.
+            createAndroidSourceSetConfigurations(project, kotlinTarget = null)
         }
     }
 
@@ -121,15 +139,10 @@ class KspConfigurations(private val project: Project) {
      */
     private fun decorateKotlinTarget(target: KotlinTarget) {
         if (target.platformType == KotlinPlatformType.androidJvm) {
-            AndroidPluginIntegration.forEachAndroidSourceSet(target.project) { sourceSet ->
-                createConfiguration(
-                    name = getAndroidConfigurationName(target, sourceSet),
-                    readableSetName = "$sourceSet (Android)"
-                )
-            }
+            createAndroidSourceSetConfigurations(target.project, target)
         } else {
             target.compilations.configureEach { compilation ->
-                compilation.kotlinSourceSets.forEach { sourceSet ->
+                compilation.kotlinSourceSetsObservable.forAll { sourceSet ->
                     createConfiguration(
                         name = getKotlinConfigurationName(compilation, sourceSet),
                         readableSetName = sourceSet.name
@@ -172,5 +185,19 @@ class KspConfigurations(private val project: Project) {
         return results.mapNotNull {
             compilation.target.project.configurations.findByName(it)
         }.toSet()
+    }
+
+    /**
+     * Creates the Android sourceSet-specific KSP configurations for the given [project] and [kotlinTarget]
+     *
+     * For single-platform, [kotlinTarget] can be null.
+     */
+    private fun createAndroidSourceSetConfigurations(project: Project, kotlinTarget: KotlinTarget?) {
+        AndroidPluginIntegration.forEachAndroidSourceSet(project) { sourceSet ->
+            createConfiguration(
+                name = getAndroidConfigurationName(kotlinTarget, sourceSet),
+                readableSetName = "$sourceSet (Android)"
+            )
+        }
     }
 }

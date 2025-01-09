@@ -20,6 +20,7 @@ package com.google.devtools.ksp.processor
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.getDeclaredFunctions
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSDeclaration
@@ -79,16 +80,25 @@ class ImplicitElementProcessor : AbstractTestProcessor() {
         val comp2 = dataClass.declarations.single { it.simpleName.asString() == "comp2" } as KSPropertyDeclaration
         comp2.getter?.let { result.add("comp2.get(): ${it.origin}") }
         comp2.setter?.let { result.add("comp2.set(): ${it.origin}") }
-        val annotationType = comp1.getter?.let {
-            result.add(it.annotations.first().annotationType.resolve().declaration.qualifiedName!!.asString())
-        }
-        val ClassWithoutImplicitPrimaryConstructor =
+        val classWithoutImplicitPrimaryConstructor =
             resolver.getClassDeclarationByName("ClassWithoutImplicitPrimaryConstructor")!!
         result.add(
-            ClassWithoutImplicitPrimaryConstructor.getConstructors().map { it.toString() }.joinToString(",")
+            classWithoutImplicitPrimaryConstructor.getConstructors().map { it.toString() }.joinToString(",")
         )
-        val ImplictConstructorJava = resolver.getClassDeclarationByName("ImplictConstructorJava")!!
-        result.add(ImplictConstructorJava.getConstructors().map { it.toString() }.joinToString(","))
+        val implictConstructorJava = resolver.getClassDeclarationByName("ImplictConstructorJava")!!
+        result.add(implictConstructorJava.getConstructors().map { it.toString() }.joinToString(","))
+
+        listOf("Test", "lib.Test").forEach { clsName ->
+            resolver.getClassDeclarationByName(clsName)!!.let { cls ->
+                cls.getDeclaredProperties().single().let { annotated ->
+                    result.add(
+                        "$clsName, $annotated: ${annotated.annotations.toList().map {
+                            "${it.shortName.asString()}: ${ it.useSiteTarget }"
+                        }}"
+                    )
+                }
+            }
+        }
         return emptyList()
     }
 }

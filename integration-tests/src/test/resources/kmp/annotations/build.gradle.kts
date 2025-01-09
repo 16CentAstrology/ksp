@@ -8,9 +8,13 @@ version = "1.0-SNAPSHOT"
 kotlin {
     jvm {
     }
-    js(BOTH) {
+    js(IR) {
         browser()
         nodejs()
+    }
+    wasmJs {
+        browser()
+        binaries.executable()
     }
     linuxX64() {
     }
@@ -25,8 +29,4 @@ kotlin {
     sourceSets {
         val commonMain by getting
     }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions.freeCompilerArgs += "-Xuse-deprecated-legacy-compiler"
 }

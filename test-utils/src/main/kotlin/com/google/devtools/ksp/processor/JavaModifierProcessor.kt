@@ -18,6 +18,9 @@
 package com.google.devtools.ksp.processor
 
 import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getDeclaredFunctions
+import com.google.devtools.ksp.getVisibility
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
@@ -27,10 +30,16 @@ class JavaModifierProcessor : AbstractTestProcessor() {
     val results = mutableListOf<String>()
 
     override fun toResult(): List<String> {
-        return results
+        return results.sorted()
     }
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        listOf("ALib", "ASrc").forEach { clsName ->
+            resolver.getClassDeclarationByName(clsName)!!.let { cls ->
+                assert(cls.modifiers.contains(Modifier.FUN))
+            }
+        }
+
         resolver.getSymbolsWithAnnotation("Test")
             .map {
                 it as KSClassDeclaration
@@ -38,6 +47,15 @@ class JavaModifierProcessor : AbstractTestProcessor() {
             .forEach {
                 it.superTypes.single().resolve().declaration.accept(ModifierVisitor(resolver), Unit)
             }
+
+        resolver.getClassDeclarationByName("HasTypeAliasFuns")!!.getDeclaredFunctions().forEach { f ->
+            val decl = f.returnType!!.resolve().declaration
+            val declName = decl.simpleName.asString().toString()
+            val visibility = decl.getVisibility().toString()
+            val modifiers = decl.modifiers.map { it.toString() }
+            results.add("$declName: Visibility: $visibility")
+            results.add("$declName: Modifiers: $modifiers")
+        }
         return emptyList()
     }
 
@@ -60,12 +78,8 @@ class JavaModifierProcessor : AbstractTestProcessor() {
 
         @OptIn(KspExperimental::class)
         private fun KSDeclaration.toSignature(): String {
-            val parent = parentDeclaration
-            val id = if (parent == null) {
-                ""
-            } else {
-                "${parent.simpleName.asString()}."
-            } + simpleName.asString()
+            val id = qualifiedName?.asString()
+                ?: "${parentDeclaration?.qualifiedName?.asString()}.${simpleName.asString()}"
             val modifiersSignature = modifiers.map { it.toString() }.sorted().joinToString(" ")
             val extras = resolver.effectiveJavaModifiers(this).map { it.toString() }.sorted().joinToString(" ").trim()
             return "$id: $modifiersSignature".trim() + " : " + extras

@@ -21,6 +21,7 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 
 @KspExperimental
 class MapSignatureProcessor : AbstractTestProcessor() {
@@ -31,13 +32,22 @@ class MapSignatureProcessor : AbstractTestProcessor() {
     }
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        listOf("Cls", "JavaIntefaceWithVoid", "JavaClass", "JavaAnno")
+        listOf("Cls", "JavaIntefaceWithVoid", "JavaClass", "JavaAnno", "JavaEnum")
             .map { className ->
                 resolver.getClassDeclarationByName(className)!!
             }.forEach { subject ->
                 result.add(resolver.mapToJvmSignature(subject)!!)
                 subject.declarations.forEach {
+                    var returnTypeSignature: String? = null
+                    if (it is KSFunctionDeclaration) {
+                        val decl = it.returnType!!.resolve().declaration
+                        returnTypeSignature = resolver.mapToJvmSignature(decl)
+                    }
                     result.add(it.simpleName.asString() + ": " + resolver.mapToJvmSignature(it))
+                    if (it is KSFunctionDeclaration) {
+                        val decl = it.returnType!!.resolve().declaration
+                        assert(returnTypeSignature == resolver.mapToJvmSignature(decl))
+                    }
                 }
             }
         return emptyList()

@@ -1,4 +1,6 @@
+import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.containingFile
+import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.*
 import java.io.OutputStream
@@ -6,6 +8,7 @@ import java.io.OutputStream
 class TestProcessor : SymbolProcessor {
     lateinit var codeGenerator: CodeGenerator
     lateinit var file: OutputStream
+    lateinit var logger: KSPLogger
     var invoked = false
 
     fun emit(s: String, indent: String) {
@@ -18,6 +21,7 @@ class TestProcessor : SymbolProcessor {
         codeGenerator: CodeGenerator,
         logger: KSPLogger
     ) {
+        this.logger = logger
         logger.warn("This is a harmless warning.")
         this.codeGenerator = codeGenerator
         file = codeGenerator.createNewFile(Dependencies(false), "", "TestProcessor", "log")
@@ -27,7 +31,9 @@ class TestProcessor : SymbolProcessor {
         javaFile.appendText("class Generated {}")
     }
 
+    @OptIn(KspExperimental::class)
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        logger.warn("Module name is ${resolver.getModuleName().asString()}")
         if (invoked) {
             return emptyList()
         }
@@ -43,6 +49,14 @@ class TestProcessor : SymbolProcessor {
         for (file in files) {
             emit("TestProcessor: processing ${file.fileName}", "")
             file.accept(visitor, "")
+        }
+
+        resolver.getClassDeclarationByName("com.example.AClass")?.let { aClass ->
+            aClass.declarations.single { it.simpleName.asString() == "internalFun" }.let { internalFun ->
+                val internalName = resolver.getJvmName(internalFun as KSFunctionDeclaration)
+                val moduleName = resolver.getModuleName().asString()
+                logger.warn("[$moduleName] Mangled name for internalFun: $internalName")
+            }
         }
         invoked = true
         return emptyList()
@@ -68,6 +82,11 @@ class TestProcessor : SymbolProcessor {
         override fun visitDynamicReference(reference: KSDynamicReference, data: String) {
             TODO("Not yet implemented")
         }
+
+        override fun visitDefNonNullReference(reference: KSDefNonNullReference, data: String) {
+            TODO("Not yet implemented")
+        }
+
         val visited = HashSet<Any>()
 
         private fun checkVisited(symbol: Any): Boolean {
@@ -273,6 +292,11 @@ class TestProcessorProvider2 : SymbolProcessorProvider {
             env.logger.warn("language version: ${env.kotlinVersion}")
             env.logger.warn("api version: ${env.apiVersion}")
             env.logger.warn("compiler version: ${env.compilerVersion}")
+            env.logger.warn("ksp version: ${env.kspVersion}")
+            env.platforms.filterIsInstance<JvmPlatformInfo>().single().let {
+                env.logger.warn("platform: $it")
+                env.logger.warn("jvm default mode: ${it.jvmDefaultMode}")
+            }
         }
     }
 }

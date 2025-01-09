@@ -2,7 +2,8 @@ plugins {
     kotlin("jvm")
 }
 
-repositories {
-    mavenCentral()
+allprojects {
+    repositories {
+        mavenCentral()
+    }
 }
-

@@ -16,6 +16,10 @@
  */
 package com.google.devtools.ksp.impl.symbol.kotlin
 
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.common.toKSModifiers
+import com.google.devtools.ksp.impl.symbol.java.KSAnnotationJavaImpl
+import com.google.devtools.ksp.impl.symbol.util.toKSModifiers
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
@@ -25,25 +29,27 @@ import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.Location
 import com.google.devtools.ksp.symbol.Modifier
 import com.google.devtools.ksp.symbol.Origin
-import com.google.devtools.ksp.toKSModifiers
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiJvmModifiersOwner
 import com.intellij.psi.PsiModifierListOwner
-import org.jetbrains.kotlin.analysis.api.symbols.KtClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtDeclarationSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtFunctionLikeSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtNamedClassOrObjectSymbol
-import org.jetbrains.kotlin.analysis.api.symbols.KtPropertySymbol
-import org.jetbrains.kotlin.analysis.api.symbols.markers.KtNamedSymbol
+import org.jetbrains.kotlin.analysis.api.KaExperimentalApi
+import org.jetbrains.kotlin.analysis.api.symbols.*
+import org.jetbrains.kotlin.analysis.api.symbols.markers.KaNamedSymbol
+import org.jetbrains.kotlin.analysis.utils.printer.parentOfType
+import org.jetbrains.kotlin.psi.KtAnnotated
 import org.jetbrains.kotlin.psi.KtModifierListOwner
 
-abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KtDeclarationSymbol) : KSDeclaration {
-    override val origin: Origin = mapAAOrigin(ktDeclarationSymbol.origin)
+abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KaDeclarationSymbol) : KSDeclaration, Deferrable {
+    override val origin: Origin by lazy {
+        mapAAOrigin(ktDeclarationSymbol)
+    }
 
     override val location: Location by lazy {
         ktDeclarationSymbol.psi.toLocation()
     }
 
     override val simpleName: KSName by lazy {
-        KSNameImpl.getCached((ktDeclarationSymbol as? KtNamedSymbol)?.name?.asString() ?: "")
+        KSNameImpl.getCached((ktDeclarationSymbol as? KaNamedSymbol)?.name?.asString() ?: "")
     }
 
     override val annotations: Sequence<KSAnnotation> by lazy {
@@ -51,16 +57,21 @@ abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KtDeclarationS
     }
 
     override val modifiers: Set<Modifier> by lazy {
-        when (val psi = ktDeclarationSymbol.psi) {
-            is KtModifierListOwner -> psi.toKSModifiers()
-            is PsiModifierListOwner -> psi.toKSModifiers()
-            null -> when (ktDeclarationSymbol) {
-                is KtPropertySymbol -> ktDeclarationSymbol.toModifiers()
-                is KtClassOrObjectSymbol -> ktDeclarationSymbol.toModifiers()
-                is KtFunctionLikeSymbol -> ktDeclarationSymbol.toModifiers()
+        if (origin == Origin.JAVA_LIB || origin == Origin.KOTLIN_LIB || origin == Origin.SYNTHETIC) {
+            when (ktDeclarationSymbol) {
+                is KaPropertySymbol -> ktDeclarationSymbol.toModifiers()
+                is KaClassSymbol -> ktDeclarationSymbol.toModifiers()
+                is KaFunctionSymbol -> ktDeclarationSymbol.toModifiers()
+                is KaJavaFieldSymbol -> ktDeclarationSymbol.toModifiers()
+                is KaTypeAliasSymbol -> ktDeclarationSymbol.toModifiers()
                 else -> throw IllegalStateException("Unexpected symbol type ${ktDeclarationSymbol.javaClass}")
             }
-            else -> emptySet()
+        } else {
+            when (val psi = ktDeclarationSymbol.psi) {
+                is KtModifierListOwner -> psi.toKSModifiers()
+                is PsiModifierListOwner -> psi.toKSModifiers()
+                else -> throw IllegalStateException("Unexpected symbol type ${ktDeclarationSymbol.psi?.javaClass}")
+            }
         }
     }
 
@@ -69,10 +80,23 @@ abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KtDeclarationS
     }
 
     override val packageName: KSName by lazy {
-        ((containingFile?.packageName ?: ktDeclarationSymbol.getContainingKSSymbol()?.packageName)?.asString() ?: "")
-            .let { KSNameImpl.getCached(it) }
+        // source
+        if (origin == Origin.KOTLIN || origin == Origin.JAVA) {
+            containingFile!!.packageName
+        } else {
+            // top level declaration
+            when (ktDeclarationSymbol) {
+                is KaClassLikeSymbol -> ktDeclarationSymbol.classId?.packageFqName?.asString()
+                is KaCallableSymbol -> ktDeclarationSymbol.callableId?.packageName?.asString()
+                else -> null
+            }?.let { KSNameImpl.getCached(it) }
+                //  null -> non top level declaration, find in parent
+                ?: ktDeclarationSymbol.getContainingKSSymbol()?.packageName
+                ?: throw IllegalStateException("failed to find package name for $this")
+        }
     }
 
+    @OptIn(KaExperimentalApi::class)
     override val typeParameters: List<KSTypeParameter> by lazy {
         ktDeclarationSymbol.typeParameters.map { KSTypeParameterImpl.getCached(it) }
     }
@@ -83,8 +107,10 @@ abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KtDeclarationS
 
     override val parent: KSNode? by lazy {
         analyze {
-            ktDeclarationSymbol.getContainingSymbol()?.let {
-                KSClassDeclarationImpl.getCached(it as KtNamedClassOrObjectSymbol)
+            ktDeclarationSymbol.containingSymbol?.let {
+                ktDeclarationSymbol.getContainingKSSymbol()
+            } ?: (ktDeclarationSymbol.psi?.parentOfType<PsiClass>())?.namedClassSymbol?.let {
+                KSClassDeclarationImpl.getCached(it)
             } ?: ktDeclarationSymbol.toContainingFile()
         }
     }
@@ -96,5 +122,14 @@ abstract class AbstractKSDeclarationImpl(val ktDeclarationSymbol: KtDeclarationS
     override val docString: String?
         get() = ktDeclarationSymbol.toDocString()
 
-    internal val originalAnnotations = ktDeclarationSymbol.annotations()
+    internal open val originalAnnotations: Sequence<KSAnnotation> by lazy {
+        if (ktDeclarationSymbol.psi is KtAnnotated) {
+            (ktDeclarationSymbol.psi as KtAnnotated).annotations(ktDeclarationSymbol, this)
+        } else if (ktDeclarationSymbol.origin == KaSymbolOrigin.JAVA_SOURCE && ktDeclarationSymbol.psi != null) {
+            (ktDeclarationSymbol.psi as PsiJvmModifiersOwner)
+                .annotations.map { KSAnnotationJavaImpl.getCached(it, this) }.asSequence()
+        } else {
+            ktDeclarationSymbol.annotations(this)
+        }
+    }
 }

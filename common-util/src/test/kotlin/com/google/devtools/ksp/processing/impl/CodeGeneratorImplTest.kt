@@ -1,6 +1,7 @@
 package com.google.devtools.ksp.processing.impl
 
-import com.google.devtools.ksp.AnyChanges
+import com.google.devtools.ksp.common.AnyChanges
+import com.google.devtools.ksp.common.impl.CodeGeneratorImpl
 import com.google.devtools.ksp.processing.Dependencies
 import org.junit.Assert
 import org.junit.Before
@@ -26,7 +27,7 @@ class CodeGeneratorImplTest {
         resourcesDir.mkdir()
         codeGenerator = CodeGeneratorImpl(
             classesDir,
-            javaDir,
+            { javaDir },
             kotlinDir,
             resourcesDir,
             baseDir,

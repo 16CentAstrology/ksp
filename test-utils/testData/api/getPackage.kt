@@ -26,10 +26,18 @@
 // symbols from package lib2
 // lib2.Foo KOTLIN_LIB
 // lib2.a KOTLIN_LIB
+// lib2.FooTypeAlias KOTLIN_LIB
 // symbols from package main.test
 // main.test.KotlinMain KOTLIN
 // main.test.C JAVA
 // main.test.D JAVA
+// symbols from package non.exist
+// symbols from package test
+// test.TestJava JAVA
+// symbols from package testlib
+// testlib.TestJavaLib JAVA_LIB
+// symbols from package main.nested
+// main.nested.MainAnotherJavaClass JAVA
 // END
 
 // MODULE: lib1
@@ -53,11 +61,17 @@ package lib2
 
 class Foo
 
+typealias FooTypeAlias = Foo
+
 val a = 0
 
 // FILE: Bar.java
 
 class Bar {}
+
+// FILE: testlib/Test.java
+package testlib;
+class TestJavaLib {}
 
 // MODULE: main(lib1, lib2)
 // FILE: a.kt
@@ -96,4 +110,17 @@ package main.test;
 
 public class L {
 
+}
+
+// FILE: test/Test.java
+package test;
+class TestJava {}
+
+// FILE: main/nested/MainAnotherJavaClass.java
+package main.nested;
+public class MainAnotherJavaClass {
+    public MainNestedJavaClass() {}
+    private String javaFieldInMain;
+    private void javaMethodInMain() {
+    }
 }

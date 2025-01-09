@@ -4,12 +4,15 @@ import org.gradle.testkit.runner.GradleRunner
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 
-class IncrementalMultiChainIT {
+@RunWith(Parameterized::class)
+class IncrementalMultiChainIT(useKSP2: Boolean) {
     @Rule
     @JvmField
-    val project: TemporaryTestProject = TemporaryTestProject("incremental-multi-chain")
+    val project: TemporaryTestProject = TemporaryTestProject("incremental-multi-chain", useKSP2 = useKSP2)
 
     @Test
     fun testMultiChain() {
@@ -44,6 +47,15 @@ class IncrementalMultiChainIT {
             Assert.assertTrue(result.output.contains("validating K1Impl.kt"))
             Assert.assertTrue(result.output.contains("validating AllImpls.kt"))
             Assert.assertTrue(result.output.contains("[K1Impl]"))
+            Assert.assertFalse(
+                File(project.root, "workload/build/generated/ksp/main/kotlin/K2ImplInfo.kt").exists()
+            )
         }
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "KSP2={0}")
+        fun params() = listOf(arrayOf(true), arrayOf(false))
     }
 }

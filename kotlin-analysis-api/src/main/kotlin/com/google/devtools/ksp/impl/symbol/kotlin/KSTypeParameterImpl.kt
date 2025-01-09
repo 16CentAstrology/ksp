@@ -17,17 +17,27 @@
 
 package com.google.devtools.ksp.impl.symbol.kotlin
 
-import com.google.devtools.ksp.KSObjectCache
+import com.google.devtools.ksp.common.KSObjectCache
+import com.google.devtools.ksp.common.impl.KSNameImpl
+import com.google.devtools.ksp.common.impl.KSTypeReferenceSyntheticImpl
+import com.google.devtools.ksp.impl.ResolverAAImpl
+import com.google.devtools.ksp.impl.symbol.kotlin.resolved.KSTypeReferenceResolvedImpl
 import com.google.devtools.ksp.symbol.*
-import org.jetbrains.kotlin.analysis.api.symbols.KtTypeParameterSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaTypeParameterSymbol
+import org.jetbrains.kotlin.analysis.api.types.KaType
 
-class KSTypeParameterImpl private constructor(internal val ktTypeParameterSymbol: KtTypeParameterSymbol) :
+class KSTypeParameterImpl private constructor(
+    internal val ktTypeParameterSymbol: KaTypeParameterSymbol,
+    private val boundsSubstitued: List<KaType>?
+) :
     KSTypeParameter,
     AbstractKSDeclarationImpl(ktTypeParameterSymbol),
     KSExpectActual by KSExpectActualImpl(ktTypeParameterSymbol) {
-    companion object : KSObjectCache<KtTypeParameterSymbol, KSTypeParameterImpl>() {
-        fun getCached(ktTypeParameterSymbol: KtTypeParameterSymbol) =
-            cache.getOrPut(ktTypeParameterSymbol) { KSTypeParameterImpl(ktTypeParameterSymbol) }
+    companion object : KSObjectCache<Pair<KaTypeParameterSymbol, List<KaType>?>, KSTypeParameterImpl>() {
+        fun getCached(ktTypeParameterSymbol: KaTypeParameterSymbol, bounds: List<KaType>? = null) =
+            cache.getOrPut(Pair(ktTypeParameterSymbol, bounds)) {
+                KSTypeParameterImpl(ktTypeParameterSymbol, bounds)
+            }
     }
 
     override val name: KSName by lazy {
@@ -36,8 +46,8 @@ class KSTypeParameterImpl private constructor(internal val ktTypeParameterSymbol
 
     override val variance: Variance by lazy {
         when (ktTypeParameterSymbol.variance) {
-            org.jetbrains.kotlin.types.Variance.IN_VARIANCE -> Variance.COVARIANT
-            org.jetbrains.kotlin.types.Variance.OUT_VARIANCE -> Variance.CONTRAVARIANT
+            org.jetbrains.kotlin.types.Variance.IN_VARIANCE -> Variance.CONTRAVARIANT
+            org.jetbrains.kotlin.types.Variance.OUT_VARIANCE -> Variance.COVARIANT
             org.jetbrains.kotlin.types.Variance.INVARIANT -> Variance.INVARIANT
         }
     }
@@ -45,18 +55,30 @@ class KSTypeParameterImpl private constructor(internal val ktTypeParameterSymbol
     override val isReified: Boolean = ktTypeParameterSymbol.isReified
 
     override val bounds: Sequence<KSTypeReference> by lazy {
-        ktTypeParameterSymbol.upperBounds.asSequence().mapIndexed { index, type ->
-            KSTypeReferenceImpl.getCached(type, this@KSTypeParameterImpl, index)
+        boundsSubstitued?.mapIndexed { index, type ->
+            KSTypeReferenceResolvedImpl.getCached(type, this@KSTypeParameterImpl, index)
+        }?.asSequence() ?: ktTypeParameterSymbol.upperBounds.asSequence().mapIndexed { index, type ->
+            KSTypeReferenceResolvedImpl.getCached(type, this@KSTypeParameterImpl, index)
+        }.ifEmpty {
+            sequenceOf(
+                KSTypeReferenceSyntheticImpl.getCached(ResolverAAImpl.instance.builtIns.anyType.makeNullable(), this)
+            )
         }
     }
 
     override val typeParameters: List<KSTypeParameter> = emptyList()
 
     override val qualifiedName: KSName? by lazy {
-        KSNameImpl.getCached("${this.parentDeclaration!!.qualifiedName!!.asString()}.${simpleName.asString()}")
+        this.parentDeclaration?.qualifiedName?.let {
+            KSNameImpl.getCached("${it.asString()}.${simpleName.asString()}")
+        }
     }
 
     override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
         return visitor.visitTypeParameter(this, data)
+    }
+
+    override fun defer(): Restorable? {
+        return ktTypeParameterSymbol.defer(::getCached)
     }
 }

@@ -5,14 +5,17 @@ import org.gradle.testkit.runner.TaskOutcome
 import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 
-class IncrementalCPIT {
+@RunWith(Parameterized::class)
+class IncrementalCPIT(val useKSP2: Boolean) {
     @Rule
     @JvmField
-    val project: TemporaryTestProject = TemporaryTestProject("incremental-classpath")
+    val project: TemporaryTestProject = TemporaryTestProject("incremental-classpath", useKSP2 = useKSP2)
 
-    val src2Dirty = listOf(
+    private val src2Dirty = listOf(
         "l1/src/main/kotlin/p1/L1.kt" to setOf(
             "w: [ksp] p1/K1.kt",
             "w: [ksp] processing done",
@@ -35,7 +38,7 @@ class IncrementalCPIT {
         ),
     )
 
-    val emptyMessage = setOf("w: [ksp] processing done")
+    private val emptyMessage = setOf("w: [ksp] processing done")
 
     @Test
     fun testCPChanges() {
@@ -45,7 +48,7 @@ class IncrementalCPIT {
             Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:assemble")?.outcome)
         }
 
-        src2Dirty.forEach { (src, expectedDirties) ->
+        src2Dirty.forEach { (src, _) ->
             File(project.root, src).appendText("\n\n")
             gradleRunner.withArguments("assemble").build().let { result ->
                 // Trivial changes should not result in re-processing.
@@ -63,7 +66,7 @@ class IncrementalCPIT {
             }
         }
 
-        src2Dirty.forEach { (src, expectedDirties) ->
+        src2Dirty.forEach { (src, _) ->
             File(project.root, src).appendText("\n\nclass C${i++}\n")
             gradleRunner.withArguments("assemble").build().let { result ->
                 Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:kspKotlin")?.outcome)
@@ -74,8 +77,100 @@ class IncrementalCPIT {
         }
     }
 
+    private val func2Dirty = listOf(
+        "l1/src/main/kotlin/p1/TopFunc1.kt" to setOf(
+            "w: [ksp] processing done",
+        ),
+    )
+
+    @Test
+    fun testCPChangesForFunctions() {
+        val gradleRunner = GradleRunner.create().withProjectDir(project.root)
+
+        gradleRunner.withArguments("clean", "assemble").build().let { result ->
+            Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:assemble")?.outcome)
+        }
+
+        // Dummy changes
+        func2Dirty.forEach { (src, _) ->
+            File(project.root, src).appendText("\n\n")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                // Trivial changes should not result in re-processing.
+                Assert.assertEquals(TaskOutcome.UP_TO_DATE, result.task(":workload:kspKotlin")?.outcome)
+            }
+        }
+
+        // Value changes
+        func2Dirty.forEach { (src, _) ->
+            File(project.root, src).writeText("package p1\n\nfun MyTopFunc1(): Int = 1")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                // Value changes should not result in re-processing.
+                Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:kspKotlin")?.outcome)
+                val dirties = result.output.lines().filter { it.startsWith("w: [ksp]") }.toSet()
+                // Non-signature changes should not affect anything.
+                Assert.assertEquals(emptyMessage, dirties)
+            }
+        }
+
+        // Signature changes
+        func2Dirty.forEach { (src, expectedDirties) ->
+            File(project.root, src).writeText("package p1\n\nfun MyTopFunc1(): Double = 1.0")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:kspKotlin")?.outcome)
+                val dirties = result.output.lines().filter { it.startsWith("w: [ksp]") }.toSet()
+                Assert.assertEquals(expectedDirties, dirties)
+            }
+        }
+    }
+
+    private val prop2Dirty = listOf(
+        "l1/src/main/kotlin/p1/TopProp1.kt" to setOf(
+            "w: [ksp] processing done",
+        ),
+    )
+
+    @Test
+    fun testCPChangesForProperties() {
+        val gradleRunner = GradleRunner.create().withProjectDir(project.root)
+
+        gradleRunner.withArguments("clean", "assemble").build().let { result ->
+            Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:assemble")?.outcome)
+        }
+
+        // Dummy changes
+        prop2Dirty.forEach { (src, _) ->
+            File(project.root, src).appendText("\n\n")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                // Trivial changes should not result in re-processing.
+                Assert.assertEquals(TaskOutcome.UP_TO_DATE, result.task(":workload:kspKotlin")?.outcome)
+            }
+        }
+
+        // Value changes
+        prop2Dirty.forEach { (src, _) ->
+            File(project.root, src).writeText("package p1\n\nval MyTopProp1: Int = 1")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                // Value changes should not result in re-processing.
+                Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:kspKotlin")?.outcome)
+                val dirties = result.output.lines().filter { it.startsWith("w: [ksp]") }.toSet()
+                // Non-signature changes should not affect anything.
+                Assert.assertEquals(emptyMessage, dirties)
+            }
+        }
+
+        // Signature changes
+        prop2Dirty.forEach { (src, expectedDirties) ->
+            File(project.root, src).writeText("package p1\n\nval MyTopProp1: Double = 1.0")
+            gradleRunner.withArguments("assemble").build().let { result ->
+                Assert.assertEquals(TaskOutcome.SUCCESS, result.task(":workload:kspKotlin")?.outcome)
+                val dirties = result.output.lines().filter { it.startsWith("w: [ksp]") }.toSet()
+                Assert.assertEquals(expectedDirties, dirties)
+            }
+        }
+    }
+
     private fun toggleFlags(vararg extras: String) {
-        val gradleRunner = GradleRunner.create().withProjectDir(project.root).withDebug(true)
+        val gradleRunner = GradleRunner.create().withProjectDir(project.root)
 
         gradleRunner.withArguments(
             *extras,
@@ -126,5 +221,11 @@ class IncrementalCPIT {
     @Test
     fun toggleIncrementalFlagsWithConfigurationCache() {
         toggleFlags("--configuration-cache")
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "KSP2={0}")
+        fun params() = listOf(arrayOf(true), arrayOf(false))
     }
 }
